@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,73 +11,164 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
-const asignaturasIniciales = [
-  { id: "MAT101", nombre: "Matemáticas Básicas", creditos: 4 },
-  { id: "FIS102", nombre: "Física General", creditos: 5 },
-  { id: "PRO103", nombre: "Programación I", creditos: 4 },
-];
-
 export default function AsignaturasScreen() {
-  const [asignaturas, setAsignaturas] = useState(asignaturasIniciales);
+  interface Asignatura {
+    id: string;
+    nombre: string;
+    creditos: number;
+    horasPracticas: number;
+    horasTeoricas: number;
+    prerequisitos: string;
+  }
+
+  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
 
   // Modal edición
   const [modalVisible, setModalVisible] = useState(false);
   const [editId, setEditId] = useState("");
   const [editNombre, setEditNombre] = useState("");
   const [editCreditos, setEditCreditos] = useState("");
+  const [editHorasPracticas, setEditHorasPracticas] = useState("");
+  const [editHorasTeoricas, setEditHorasTeoricas] = useState("");
+  const [editPrerequisitos, setEditPrerequisitos] = useState("");
 
   // Modal nueva
   const [modalNuevaVisible, setModalNuevaVisible] = useState(false);
   const [nuevoId, setNuevoId] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevoCreditos, setNuevoCreditos] = useState("");
+  const [nuevasHorasPracticas, setNuevasHorasPracticas] = useState("");
+  const [nuevasHorasTeoricas, setNuevasHorasTeoricas] = useState("");
+  const [nuevosPrerequisitos, setNuevosPrerequisitos] = useState("");
 
-  const eliminarAsignatura = (id: string) => {
-    setAsignaturas(asignaturas.filter((a) => a.id !== id));
+  const API_URL = "http://localhost:4000"; // Cambia esto si tu backend está en otro lugar
+
+  // Obtener asignaturas desde la base de datos
+  useEffect(() => {
+    const fetchAsignaturas = async () => {
+      try {
+        const response = await fetch(`${API_URL}/asignaturas`);
+        const data = await response.json();
+        setAsignaturas(data);
+      } catch (error) {
+        console.error("Error al obtener asignaturas:", error);
+        Alert.alert("Error", "No se pudieron cargar las asignaturas");
+      }
+    };
+
+    fetchAsignaturas();
+  }, []);
+
+  // Eliminar asignatura
+  const eliminarAsignatura = async (id: any) => {
+    try {
+      await fetch(`${API_URL}/asignaturas/${id}`, {
+        method: "DELETE",
+      });
+      setAsignaturas(asignaturas.filter((a) => a.id !== id));
+    } catch (error) {
+      console.error("Error al eliminar asignatura:", error);
+      Alert.alert("Error", "No se pudo eliminar la asignatura");
+    }
   };
 
-  const abrirEditor = (asignatura: any) => {
+  // Abrir editor
+  const abrirEditor = (asignatura: Asignatura) => {
     setEditId(asignatura.id);
     setEditNombre(asignatura.nombre);
     setEditCreditos(asignatura.creditos.toString());
+    setEditHorasPracticas(asignatura.horasPracticas.toString());
+    setEditHorasTeoricas(asignatura.horasTeoricas.toString());
+    setEditPrerequisitos(asignatura.prerequisitos);
     setModalVisible(true);
   };
 
-  const guardarCambios = () => {
-    const nuevasAsignaturas = asignaturas.map((a) =>
-      a.id === editId
-        ? { ...a, nombre: editNombre, creditos: parseInt(editCreditos) }
-        : a
-    );
-    setAsignaturas(nuevasAsignaturas);
-    setModalVisible(false);
+  // Guardar cambios en la asignatura
+  const guardarCambios = async () => {
+    try {
+      await fetch(`${API_URL}/asignaturas/${editId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: editId,
+          nombre: editNombre,
+          creditos: parseInt(editCreditos),
+          horasPracticas: parseInt(editHorasPracticas),
+          horasTeoricas: parseInt(editHorasTeoricas),
+          prerequisitos: editPrerequisitos,
+        }),
+      });
+
+      const nuevasAsignaturas = asignaturas.map((a) =>
+        a.id === editId
+          ? {
+              ...a,
+              nombre: editNombre,
+              creditos: parseInt(editCreditos),
+              horasPracticas: parseInt(editHorasPracticas),
+              horasTeoricas: parseInt(editHorasTeoricas),
+              prerequisitos: editPrerequisitos,
+            }
+          : a
+      );
+      setAsignaturas(nuevasAsignaturas);
+      setModalVisible(false);
+    } catch (error) {
+      console.error("Error al guardar cambios:", error);
+      Alert.alert("Error", "No se pudieron guardar los cambios");
+    }
   };
 
-  const agregarAsignatura = () => {
-    if (!nuevoId || !nuevoNombre || !nuevoCreditos) {
+  // Agregar nueva asignatura
+  const agregarAsignatura = async () => {
+    if (
+      !nuevoId ||
+      !nuevoNombre ||
+      !nuevoCreditos ||
+      !nuevasHorasPracticas ||
+      !nuevasHorasTeoricas ||
+      !nuevosPrerequisitos
+    ) {
       Alert.alert("Todos los campos son obligatorios");
       return;
     }
 
-    const yaExiste = asignaturas.find((a) => a.id === nuevoId);
-    if (yaExiste) {
-      Alert.alert("El código ya existe");
-      return;
+    const nuevaAsignatura = {
+      id: nuevoId,
+      nombre: nuevoNombre,
+      creditos: parseInt(nuevoCreditos),
+      horasPracticas: parseInt(nuevasHorasPracticas),
+      horasTeoricas: parseInt(nuevasHorasTeoricas),
+      prerequisitos: nuevosPrerequisitos,
+    };
+
+    try {
+      const response = await fetch(`${API_URL}/asignaturas`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(nuevaAsignatura),
+      });
+
+      if (response.ok) {
+        setAsignaturas([...asignaturas, nuevaAsignatura]);
+        setModalNuevaVisible(false);
+        setNuevoId("");
+        setNuevoNombre("");
+        setNuevoCreditos("");
+        setNuevasHorasPracticas("");
+        setNuevasHorasTeoricas("");
+        setNuevosPrerequisitos("");
+      } else {
+        Alert.alert("Error", "No se pudo agregar la asignatura");
+      }
+    } catch (error) {
+      console.error("Error al agregar asignatura:", error);
+      Alert.alert("Error", "No se pudo agregar la asignatura");
     }
-
-    setAsignaturas([
-      ...asignaturas,
-      {
-        id: nuevoId,
-        nombre: nuevoNombre,
-        creditos: parseInt(nuevoCreditos),
-      },
-    ]);
-
-    setModalNuevaVisible(false);
-    setNuevoId("");
-    setNuevoNombre("");
-    setNuevoCreditos("");
   };
 
   return (
@@ -91,6 +182,9 @@ export default function AsignaturasScreen() {
           <Text className="w-[80px] font-bold text-gray-600">Código</Text>
           <Text className="flex-1 font-bold text-gray-600">Nombre</Text>
           <Text className="w-[60px] font-bold text-gray-600">Créditos</Text>
+          <Text className="w-[60px] font-bold text-gray-600">Prácticas</Text>
+          <Text className="w-[60px] font-bold text-gray-600">Teóricas</Text>
+          <Text className="flex-1 font-bold text-gray-600">Prerrequisitos</Text>
           <Text className="w-[80px] font-bold text-gray-600 text-right">
             Acciones
           </Text>
@@ -106,6 +200,13 @@ export default function AsignaturasScreen() {
               <Text className="w-[60px] text-center text-gray-800">
                 {item.creditos}
               </Text>
+              <Text className="w-[60px] text-center text-gray-800">
+                {item.horasPracticas}
+              </Text>
+              <Text className="w-[60px] text-center text-gray-800">
+                {item.horasTeoricas}
+              </Text>
+              <Text className="flex-1 text-gray-800">{item.prerequisitos}</Text>
               <View className="w-[80px] flex-row justify-end space-x-3">
                 <TouchableOpacity onPress={() => abrirEditor(item)}>
                   <Feather name="edit" size={20} color="#3b82f6" />
@@ -147,6 +248,30 @@ export default function AsignaturasScreen() {
                 value={editCreditos}
                 onChangeText={setEditCreditos}
                 keyboardType="numeric"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+
+              <Text className="mb-1 text-sm text-gray-700">Horas Prácticas</Text>
+              <TextInput
+                value={editHorasPracticas}
+                onChangeText={setEditHorasPracticas}
+                keyboardType="numeric"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+
+              <Text className="mb-1 text-sm text-gray-700">Horas Teóricas</Text>
+              <TextInput
+                value={editHorasTeoricas}
+                onChangeText={setEditHorasTeoricas}
+                keyboardType="numeric"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+
+              <Text className="mb-1 text-sm text-gray-700">Prerrequisitos</Text>
+              <TextInput
+                value={editPrerequisitos}
+                onChangeText={setEditPrerequisitos}
+                placeholder="Ej. INF101, MAT102"
                 className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
               />
 
@@ -192,6 +317,32 @@ export default function AsignaturasScreen() {
                 onChangeText={setNuevoCreditos}
                 placeholder="Ej. 4"
                 keyboardType="numeric"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+
+              <Text className="mb-1 text-sm text-gray-700">Horas Prácticas</Text>
+              <TextInput
+                value={nuevasHorasPracticas}
+                onChangeText={setNuevasHorasPracticas}
+                placeholder="Ej. 2"
+                keyboardType="numeric"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+
+              <Text className="mb-1 text-sm text-gray-700">Horas Teóricas</Text>
+              <TextInput
+                value={nuevasHorasTeoricas}
+                onChangeText={setNuevasHorasTeoricas}
+                placeholder="Ej. 3"
+                keyboardType="numeric"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+
+              <Text className="mb-1 text-sm text-gray-700">Prerrequisitos</Text>
+              <TextInput
+                value={nuevosPrerequisitos}
+                onChangeText={setNuevosPrerequisitos}
+                placeholder="Ej. INF101, MAT102"
                 className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
               />
 
