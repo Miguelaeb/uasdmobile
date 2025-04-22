@@ -9,6 +9,18 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router, useRouter } from "expo-router";
+import { Feather } from "@expo/vector-icons";
+
+const BackButton = () => {
+  const router = useRouter();
+  return (
+    <TouchableOpacity onPress={() => router.push("/")} className="flex-row items-center p-2">
+      <Feather name="arrow-left" size={24} color="#3b82f6" />
+      <Text className="ml-2 text-blue-600 font-semibold">Volver</Text>
+    </TouchableOpacity>
+  );
+};
 
 export default function NuevoPlan() {
   const [nombre, setNombre] = useState("");
@@ -68,6 +80,8 @@ export default function NuevoPlan() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        <BackButton />
+        {/* Título de la pantalla */}
         <Text className="mb-6 text-xl font-bold text-blue-900">
           Ingresar Plan de Estudio
         </Text>
@@ -113,6 +127,15 @@ export default function NuevoPlan() {
         >
           <Text className="text-base font-bold text-white">Crear</Text>
         </TouchableOpacity>
+
+        <View className="mt-6">
+          <TouchableOpacity
+            className="items-center py-3 bg-gray-800 rounded-md"
+            onPress={() => router.push("/")}
+          >
+            <Text className="text-base font-bold text-white">Volver a la Página Principal</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, FlatList, Alert, ScrollView } from "react-native";
-import { Link } from "expo-router";
+import { Link, router, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 const API_URL = "http://localhost:4000";
+
+const BackButton = () => {
+  const router = useRouter();
+  return (
+    <TouchableOpacity onPress={() => router.push("/")} className="flex-row items-center p-2">
+      <Feather name="arrow-left" size={24} color="#3b82f6" />
+      <Text className="ml-2 text-blue-600 font-semibold">Volver</Text>
+    </TouchableOpacity>
+  );
+};
 
 export default function MisPlanesScreen() {
   interface Plan {
@@ -105,9 +115,22 @@ export default function MisPlanesScreen() {
     }, {});
   };
 
+  const calculateTotals = (asignaturas: Asignatura[]) => {
+    return asignaturas.reduce(
+      (totals, asignatura) => {
+        totals.horasTeoricas += asignatura.horasTeoricas;
+        totals.horasPracticas += asignatura.horasPracticas;
+        totals.creditos += asignatura.creditos;
+        return totals;
+      },
+      { horasTeoricas: 0, horasPracticas: 0, creditos: 0 }
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-1 px-4 pt-6 bg-white">
+        <BackButton />
         {!selectedPlan ? (
           <>
             <Text className="mb-4 text-xl font-bold text-blue-900">
@@ -175,62 +198,77 @@ export default function MisPlanesScreen() {
                 No hay asignaturas registradas para este plan.
               </Text>
             ) : (
-              <ScrollView>
-                {Object.entries(groupBySemester(pensum)).map(
-                  ([semestre, asignaturas]) => (
-                    <View key={semestre} className="mb-6">
-                      <Text className="mb-2 text-lg font-bold text-blue-900">
-                        Semestre {semestre}
-                      </Text>
-                      <View className="bg-gray-100 rounded-lg p-4">
-                        <View className="flex-row border-b border-gray-300 pb-2 mb-2">
-                          <Text style={{ flex: 1, fontWeight: "bold", textAlign: "center" }}>
-                            Código
-                          </Text>
-                          <Text style={{ flex: 2, fontWeight: "bold", textAlign: "center" }}>
-                            Asignatura
-                          </Text>
-                          <Text style={{ flex: 1, fontWeight: "bold", textAlign: "center" }}>
-                            HT
-                          </Text>
-                          <Text style={{ flex: 1, fontWeight: "bold", textAlign: "center" }}>
-                            HP
-                          </Text>
-                          <Text style={{ flex: 1, fontWeight: "bold", textAlign: "center" }}>
-                            CR
-                          </Text>
-                          <Text style={{ flex: 2, fontWeight: "bold", textAlign: "center" }}>
-                            Prerrequisitos
-                          </Text>
-                        </View>
-                        {asignaturas.map((asignatura, index) => (
-                          <View
-                            key={index}
-                            className="flex-row py-2 border-b border-gray-200 last:border-b-0"
-                          >
-                            <Text style={{ flex: 1, textAlign: "center" }}>{asignatura.id}</Text>
-                            <Text style={{ flex: 2, textAlign: "center" }}>
-                              {asignatura.nombre}
+              <>
+                <ScrollView>
+                  {Object.entries(groupBySemester(pensum)).map(
+                    ([semestre, asignaturas]) => (
+                      <View key={semestre} className="mb-6">
+                        <Text className="mb-2 text-lg font-bold text-blue-900">
+                          Semestre {semestre}
+                        </Text>
+                        <View className="bg-gray-100 rounded-lg p-4">
+                          <View className="flex-row border-b border-gray-300 pb-2 mb-2">
+                            <Text style={{ flex: 1, fontWeight: "bold", textAlign: "center" }}>
+                              Código
                             </Text>
-                            <Text style={{ flex: 1, textAlign: "center" }}>
-                              {asignatura.horasTeoricas}
+                            <Text style={{ flex: 2, fontWeight: "bold", textAlign: "center" }}>
+                              Asignatura
                             </Text>
-                            <Text style={{ flex: 1, textAlign: "center" }}>
-                              {asignatura.horasPracticas}
+                            <Text style={{ flex: 1, fontWeight: "bold", textAlign: "center" }}>
+                              HT
                             </Text>
-                            <Text style={{ flex: 1, textAlign: "center" }}>
-                              {asignatura.creditos}
+                            <Text style={{ flex: 1, fontWeight: "bold", textAlign: "center" }}>
+                              HP
                             </Text>
-                            <Text style={{ flex: 2, textAlign: "center" }}>
-                              {asignatura.prerequisitos || "Ninguno"}
+                            <Text style={{ flex: 1, fontWeight: "bold", textAlign: "center" }}>
+                              CR
+                            </Text>
+                            <Text style={{ flex: 2, fontWeight: "bold", textAlign: "center" }}>
+                              Prerrequisitos
                             </Text>
                           </View>
-                        ))}
+                          {asignaturas.map((asignatura, index) => (
+                            <View
+                              key={index}
+                              className="flex-row py-2 border-b border-gray-200 last:border-b-0"
+                            >
+                              <Text style={{ flex: 1, textAlign: "center" }}>{asignatura.id}</Text>
+                              <Text style={{ flex: 2, textAlign: "center" }}>
+                                {asignatura.nombre}
+                              </Text>
+                              <Text style={{ flex: 1, textAlign: "center" }}>
+                                {asignatura.horasTeoricas}
+                              </Text>
+                              <Text style={{ flex: 1, textAlign: "center" }}>
+                                {asignatura.horasPracticas}
+                              </Text>
+                              <Text style={{ flex: 1, textAlign: "center" }}>
+                                {asignatura.creditos}
+                              </Text>
+                              <Text style={{ flex: 2, textAlign: "center" }}>
+                                {asignatura.prerequisitos || "Ninguno"}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
                       </View>
-                    </View>
-                  )
-                )}
-              </ScrollView>
+                    )
+                  )}
+                </ScrollView>
+                <View className="mt-4 p-4 bg-gray-100 rounded-lg">
+                  <Text className="text-lg font-bold text-blue-900">Totales:</Text>
+                  {(() => {
+                    const totals = calculateTotals(pensum);
+                    return (
+                      <>
+                        <Text className="text-gray-800">Horas Teóricas: {totals.horasTeoricas}</Text>
+                        <Text className="text-gray-800">Horas Prácticas: {totals.horasPracticas}</Text>
+                        <Text className="text-gray-800">Créditos: {totals.creditos}</Text>
+                      </>
+                    );
+                  })()}
+                </View>
+              </>
             )}
           </>
         )}
@@ -241,6 +279,15 @@ export default function MisPlanesScreen() {
               <Text className="text-base font-bold text-white">+ Nuevo Plan</Text>
             </TouchableOpacity>
           </Link>
+        </View>
+
+        <View className="mt-6">
+          <TouchableOpacity
+            className="items-center py-3 bg-gray-800 rounded-md"
+            onPress={() => router.push("/")}
+          >
+            <Text className="text-base font-bold text-white">Volver a la Página Principal</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>

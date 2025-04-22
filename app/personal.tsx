@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,30 +10,35 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import axios from "axios";
+import { useRouter } from "expo-router";
 
-const personalEjemplo = [
-  {
-    id: "1",
-    nombre: "Juan Pérez",
-    correo: "juan.perez@ejemplo.com",
-    telefono: "+1 234 567 8801",
-  },
-  {
-    id: "2",
-    nombre: "María García",
-    correo: "maria.garcia@ejemplo.com",
-    telefono: "+1 234 567 8802",
-  },
-  {
-    id: "3",
-    nombre: "Carlos Rodríguez",
-    correo: "carlos.rodriguez@ejemplo.com",
-    telefono: "+1 234 567 8803",
-  },
-];
+const API_URL = "http://localhost:4000"; // Cambia esto si tu backend está en otro lugar
+
+const BackButton = () => {
+  const router = useRouter();
+  return (
+    <TouchableOpacity onPress={() => router.push("/")} className="flex-row items-center p-2">
+      <Feather name="arrow-left" size={24} color="#3b82f6" />
+      <Text className="ml-2 text-blue-600 font-semibold">Volver</Text>
+    </TouchableOpacity>
+  );
+};
 
 export default function PersonalScreen() {
-  const [personal, setPersonal] = useState(personalEjemplo);
+  const router = useRouter();
+
+  interface Personal {
+    id: string;
+    nombre: string;
+    apellido: string;
+    correo: string;
+    telefono: string;
+    puesto: string;
+  }
+
+  const [personal, setPersonal] = useState<Personal[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Modal editar
   const [modalVisible, setModalVisible] = useState(false);
@@ -42,11 +47,37 @@ export default function PersonalScreen() {
   // Modal nuevo
   const [modalNuevoVisible, setModalNuevoVisible] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoApellido, setNuevoApellido] = useState("");
   const [nuevoCorreo, setNuevoCorreo] = useState("");
   const [nuevoTelefono, setNuevoTelefono] = useState("");
+  const [nuevoPuesto, setNuevoPuesto] = useState("");
 
-  const eliminarPersonal = (id: string) => {
-    setPersonal(personal.filter((p) => p.id !== id));
+  // Obtener datos de la API
+  const fetchPersonal = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/personal`);
+      setPersonal(response.data as Personal[]);
+    } catch (error) {
+      Alert.alert("Error", "No se pudo cargar el personal.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPersonal();
+  }, []);
+
+  const eliminarPersonal = async (id: string) => {
+    console.log("ID a eliminar:", id); // Depuración
+    try {
+      await axios.delete(`${API_URL}/personal/${id}`);
+      setPersonal((prev) => prev.filter((p) => p.id !== id));
+    } catch (error) {
+      console.error("Error al eliminar el personal:", error);
+      Alert.alert("Error", "No se pudo eliminar el personal.");
+    }
   };
 
   const abrirEditor = (item: any) => {
@@ -54,63 +85,98 @@ export default function PersonalScreen() {
     setModalVisible(true);
   };
 
-  const guardarEdicion = () => {
-    setPersonal((prev) =>
-      prev.map((p) => (p.id === editItem.id ? editItem : p))
-    );
-    setModalVisible(false);
-  };
+  const guardarEdicion = async () => {
+    console.log("Datos a guardar:", editItem); // Depuración
+    try {
+      await axios.put(`${API_URL}/personal/${editItem.id}`, editItem);
 
-  const agregarPersonal = () => {
-    if (!nuevoNombre || !nuevoCorreo || !nuevoTelefono) {
-      Alert.alert("Todos los campos son obligatorios");
-      return;
+      // Recarga los datos desde el backend
+      await fetchPersonal();
+
+      // Limpia el estado y cierra el modal
+      setEditItem(null);
+      setModalVisible(false);
+    } catch (error) {
+      console.error("Error al guardar la edición:", error);
+      Alert.alert("Error", "No se pudo guardar la edición.");
     }
-
-    const nuevo = {
-      id: Date.now().toString(),
-      nombre: nuevoNombre,
-      correo: nuevoCorreo,
-      telefono: nuevoTelefono,
-    };
-
-    setPersonal([...personal, nuevo]);
-    setModalNuevoVisible(false);
-    setNuevoNombre("");
-    setNuevoCorreo("");
-    setNuevoTelefono("");
   };
+
+  const agregarPersonal = async () => {
+      if (!nuevoNombre.trim() || !nuevoApellido.trim() || !nuevoCorreo.trim() || !nuevoTelefono.trim() || !nuevoPuesto.trim()) {
+        Alert.alert("Error", "Todos los campos son obligatorios");
+        return;
+      }
+  
+      const nuevo = {
+        nombre: nuevoNombre.trim(),
+        apellido: nuevoApellido.trim(),
+        correo: nuevoCorreo.trim(),
+        telefono: nuevoTelefono.trim(),
+        puesto: nuevoPuesto.trim(),
+      };
+  
+      try {
+        const response = await axios.post<{ id: string }>(`${API_URL}/personal`, nuevo);
+  
+        // Verifica si el backend devuelve un id
+        if (!response.data.id) {
+          throw new Error("El backend no devolvió un ID para el nuevo personal.");
+        }
+  
+        // Actualiza el estado local con el nuevo registro
+        setPersonal((prev) => [...prev, { ...nuevo, id: response.data.id }]);
+  
+        // Limpia los campos del formulario y cierra el modal
+        setNuevoNombre("");
+        setNuevoApellido("");
+        setNuevoCorreo("");
+        setNuevoTelefono("");
+        setNuevoPuesto("");
+        setModalNuevoVisible(false);
+      } catch (error) {
+        console.error("Error al agregar el personal:", error);
+        Alert.alert("Error", "No se pudo agregar el personal. Verifica los datos e inténtalo nuevamente.");
+      }
+    };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-1 px-4 pt-6 bg-white">
+        <BackButton />
         <Text className="mb-4 text-xl font-bold text-blue-900">Personal</Text>
 
-        <FlatList
-          data={personal}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View className="p-4 mb-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-              <View className="flex-row items-start justify-between">
-                <View>
-                  <Text className="text-base font-semibold text-gray-800">
-                    {item.nombre}
-                  </Text>
-                  <Text className="text-sm text-gray-600">{item.correo}</Text>
-                  <Text className="text-sm text-gray-600">{item.telefono}</Text>
-                </View>
-                <View className="flex-row space-x-3">
-                  <TouchableOpacity onPress={() => abrirEditor(item)}>
-                    <Feather name="edit" size={20} color="#3b82f6" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => eliminarPersonal(item.id)}>
-                    <Feather name="trash-2" size={20} color="#ef4444" />
-                  </TouchableOpacity>
+        {loading ? (
+          <Text className="text-center text-gray-500">Cargando...</Text>
+        ) : (
+          <FlatList
+            data={personal}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View className="p-4 mb-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                <View className="flex-row items-start justify-between">
+                  <View>
+                    <Text className="text-base font-semibold text-gray-800">
+                      {item.nombre} {item.apellido}
+                    </Text>
+                    <Text className="text-sm text-gray-600">Matrícula: {item.id}</Text>
+                    <Text className="text-sm text-gray-600">{item.correo}</Text>
+                    <Text className="text-sm text-gray-600">{item.telefono}</Text>
+                    <Text className="text-sm text-gray-600">{item.puesto}</Text>
+                  </View>
+                  <View className="flex-row space-x-3">
+                    <TouchableOpacity onPress={() => abrirEditor(item)}>
+                      <Feather name="edit" size={20} color="#3b82f6" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => eliminarPersonal(item.id)}>
+                      <Feather name="trash-2" size={20} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
-        />
+            )}
+          />
+        )}
 
         <View className="mt-6">
           <TouchableOpacity
@@ -120,6 +186,15 @@ export default function PersonalScreen() {
             <Text className="text-base font-bold text-white">
               + Nuevo Personal
             </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View className="mt-6">
+          <TouchableOpacity
+            className="items-center py-3 bg-gray-800 rounded-md"
+            onPress={() => router.push("/")}
+          >
+            <Text className="text-base font-bold text-white">Volver a la Página Principal</Text>
           </TouchableOpacity>
         </View>
 
@@ -133,10 +208,17 @@ export default function PersonalScreen() {
 
               <TextInput
                 value={editItem?.nombre}
-                onChangeText={(text) =>
-                  setEditItem({ ...editItem, nombre: text })
-                }
+                onChangeText={(text) => setEditItem({ ...editItem, nombre: text })}
                 placeholder="Nombre"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+
+              <TextInput
+                value={editItem?.apellido}
+                onChangeText={(text) =>
+                  setEditItem({ ...editItem, apellido: text })
+                }
+                placeholder="Apellido"
                 className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
               />
 
@@ -157,6 +239,15 @@ export default function PersonalScreen() {
                 }
                 placeholder="Teléfono"
                 keyboardType="phone-pad"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+
+              <TextInput
+                value={editItem?.puesto}
+                onChangeText={(text) =>
+                  setEditItem({ ...editItem, puesto: text })
+                }
+                placeholder="Puesto"
                 className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
               />
 
@@ -186,7 +277,12 @@ export default function PersonalScreen() {
                 placeholder="Nombre"
                 className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
               />
-
+              <TextInput
+                value={nuevoApellido}
+                onChangeText={setNuevoApellido}
+                placeholder="Apellido"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
               <TextInput
                 value={nuevoCorreo}
                 onChangeText={setNuevoCorreo}
@@ -194,12 +290,17 @@ export default function PersonalScreen() {
                 keyboardType="email-address"
                 className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
               />
-
               <TextInput
                 value={nuevoTelefono}
                 onChangeText={setNuevoTelefono}
                 placeholder="Teléfono"
                 keyboardType="phone-pad"
+                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+              />
+              <TextInput
+                value={nuevoPuesto}
+                onChangeText={setNuevoPuesto}
+                placeholder="Puesto"
                 className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
               />
 

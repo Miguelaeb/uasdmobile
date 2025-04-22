@@ -11,6 +11,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Picker } from "@react-native-picker/picker";
 import { Feather } from "@expo/vector-icons";
+import { router, useRouter } from "expo-router";
+
+const BackButton = () => {
+  const router = useRouter();
+  return (
+    <TouchableOpacity onPress={() => router.push("/")} className="flex-row items-center p-2">
+      <Feather name="arrow-left" size={24} color="#3b82f6" />
+      <Text className="ml-2 text-blue-600 font-semibold">Volver</Text>
+    </TouchableOpacity>
+  );
+};
 
 export default function AsignaturasScreen() {
   interface Asignatura {
@@ -163,6 +174,7 @@ export default function AsignaturasScreen() {
         <Text className="mb-4 text-xl font-bold text-blue-900">
           Asignaturas
         </Text>
+        <BackButton />
 
         {/* Selector de plan */}
         <Text className="mb-1 text-sm text-gray-700">Seleccionar Plan</Text>
@@ -239,6 +251,15 @@ export default function AsignaturasScreen() {
             Selecciona un plan para ver o agregar asignaturas.
           </Text>
         )}
+
+        <View className="mt-6">
+          <TouchableOpacity
+            className="items-center py-3 bg-gray-800 rounded-md"
+            onPress={() => router.push("/")}
+          >
+            <Text className="text-base font-bold text-white">Volver a la Página Principal</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Modal nueva asignatura */}
         <Modal visible={modalNuevaVisible} transparent animationType="slide">
