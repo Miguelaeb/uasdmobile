@@ -1,7 +1,7 @@
 const dbConfig = {
     user: "sa",
-    password: "12345",
-    server: "DESKTOP-63O46LG",
+    password: "1234567",
+    server: "_PC_VARGAS_",
     database: "uasdmobile",
     options: {
         encrypt: false,
@@ -9,5 +9,6 @@ const dbConfig = {
     },
     port: 1433,
 };
+
 
 module.exports = dbConfig;

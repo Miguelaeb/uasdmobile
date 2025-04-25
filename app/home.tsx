@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -14,9 +15,8 @@ import {
   AntDesign,
 } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Link } from "expo-router";
-import { useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
+import { useAuth } from "./authContext"; // Importa el contexto de autenticación
 
 const dashboardCards = [
   {
@@ -53,7 +53,7 @@ const dashboardCards = [
     label: "Competencias",
     icon: <FontAwesome5 name="tasks" size={22} color="#eab308" />,
     color: "#fef9c3",
-    href: "/competencias",
+    href: "/configuracion", // Updated to match the expected type
   },
   {
     label: "Educación Virtual",
@@ -75,35 +75,19 @@ const dashboardCards = [
   },
 ] as const;
 
-export default function Index() {
+export default function Home() {
+  const { isAuthenticated, logout } = useAuth(); // Usa el contexto de autenticación
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // Estado para la autenticación
 
-  useEffect(() => {
-    // Simula la verificación de autenticación
-    const checkAuthentication = async () => {
-      // Aquí puedes agregar tu lógica de autenticación real
-      const userAuthenticated = false; // Cambia esto según tu lógica
-      setIsAuthenticated(userAuthenticated);
-    };
+  // Datos dinámicos del usuario
+  const [photo, setPhoto] = useState<string | null>("https://randomuser.me/api/portraits/men/32.jpg");
+  const [name, setName] = useState("Miguel");
+  const [lastName, setLastName] = useState("Evangelista");
 
-    checkAuthentication();
-  }, []);
-
-  if (isAuthenticated === null) {
-    // Muestra un indicador de carga mientras se verifica la autenticación
-    return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <Text className="text-lg text-gray-500">Cargando...</Text>
-      </SafeAreaView>
-    );
-  }
-
-  if (!isAuthenticated) {
-    // Si no está autenticado, redirige al login
-    router.replace("/login");
-    return null; // Evita renderizar contenido mientras redirige
-  }
+  const handleLogout = () => {
+    logout(); // Llama a la función de cerrar sesión
+    router.replace("/login"); // Redirige al login
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -114,32 +98,34 @@ export default function Index() {
           paddingBottom: 40,
         }}
       >
+        {/* Encabezado con datos del usuario */}
         <View className="flex-row items-center justify-between mb-6">
           <View>
             <Text className="text-sm text-gray-500">Hola,</Text>
-            <Text className="text-2xl font-bold text-blue-900">Miguel</Text>
+            <Text className="text-2xl font-bold text-blue-900">
+              {name} {lastName}
+            </Text>
           </View>
-          <View className="items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
-            <AntDesign name="smileo" size={20} color="#2563eb" />
-          </View>
+          <TouchableOpacity onPress={handleLogout} className="items-center justify-center w-10 h-10 bg-red-100 rounded-full">
+            <AntDesign name="logout" size={20} color="#dc2626" />
+          </TouchableOpacity>
         </View>
 
+        {/* Tarjeta de perfil */}
         <View className="p-4 mb-6 bg-blue-500 shadow-sm rounded-2xl">
           <View className="flex-row items-center justify-between mb-4">
             <View className="flex-row items-center">
               <Image
                 source={{
-                  uri: "https://randomuser.me/api/portraits/men/32.jpg",
+                  uri: photo || "https://via.placeholder.com/150",
                 }}
                 className="w-10 h-10 mr-3 rounded-full"
               />
               <View>
                 <Text className="text-base font-bold text-white">
-                  Miguel Evangelista
+                  {name} {lastName}
                 </Text>
-                <Text className="text-sm text-blue-100">
-                  Front End developer
-                </Text>
+                <Text className="text-sm text-blue-100">Front End Developer</Text>
               </View>
             </View>
             <Feather name="chevron-right" size={20} color="white" />
@@ -148,9 +134,7 @@ export default function Index() {
           <View className="flex-row justify-between pt-3 border-t border-blue-400">
             <View className="flex-row items-center">
               <Feather name="calendar" size={16} color="white" />
-              <Text className="ml-2 text-sm text-white">
-                Miercoles, 2 Abril
-              </Text>
+              <Text className="ml-2 text-sm text-white">Miércoles, 2 Abril</Text>
             </View>
             <View className="flex-row items-center">
               <Feather name="clock" size={16} color="white" />
@@ -159,6 +143,7 @@ export default function Index() {
           </View>
         </View>
 
+        {/* Barra de búsqueda */}
         <View className="mb-5">
           <TextInput
             placeholder="Buscar sección o módulo"
@@ -167,10 +152,10 @@ export default function Index() {
           />
         </View>
 
-        {/* Dashboard Cards */}
+        {/* Tarjetas del dashboard */}
         <View className="flex-row flex-wrap justify-between gap-y-4">
           {dashboardCards.map((card, index) => (
-            <Link href={card.href as any} key={index} asChild>
+            <Link href={card.href} key={index} asChild>
               <TouchableOpacity
                 style={{ backgroundColor: card.color }}
                 className="w-[47%] rounded-xl p-4 shadow-sm"

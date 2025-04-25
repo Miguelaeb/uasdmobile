@@ -12,13 +12,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import axios from "axios";
 import { useRouter } from "expo-router";
+import { ProtectedRoute } from "./protectedRoute"; // Importa el componente ProtectedRoute
 
 const API_URL = "http://localhost:4000"; // Cambia esto si tu backend está en otro lugar
 
 const BackButton = () => {
   const router = useRouter();
   return (
-    <TouchableOpacity onPress={() => router.push("/")} className="flex-row items-center p-2">
+    <TouchableOpacity onPress={() => router.push("/home")} className="flex-row items-center p-2">
       <Feather name="arrow-left" size={24} color="#3b82f6" />
       <Text className="ml-2 text-blue-600 font-semibold">Volver</Text>
     </TouchableOpacity>
@@ -103,219 +104,221 @@ export default function PersonalScreen() {
   };
 
   const agregarPersonal = async () => {
-      if (!nuevoNombre.trim() || !nuevoApellido.trim() || !nuevoCorreo.trim() || !nuevoTelefono.trim() || !nuevoPuesto.trim()) {
-        Alert.alert("Error", "Todos los campos son obligatorios");
-        return;
-      }
-  
-      const nuevo = {
-        nombre: nuevoNombre.trim(),
-        apellido: nuevoApellido.trim(),
-        correo: nuevoCorreo.trim(),
-        telefono: nuevoTelefono.trim(),
-        puesto: nuevoPuesto.trim(),
-      };
-  
-      try {
-        const response = await axios.post<{ id: string }>(`${API_URL}/personal`, nuevo);
-  
-        // Verifica si el backend devuelve un id
-        if (!response.data.id) {
-          throw new Error("El backend no devolvió un ID para el nuevo personal.");
-        }
-  
-        // Actualiza el estado local con el nuevo registro
-        setPersonal((prev) => [...prev, { ...nuevo, id: response.data.id }]);
-  
-        // Limpia los campos del formulario y cierra el modal
-        setNuevoNombre("");
-        setNuevoApellido("");
-        setNuevoCorreo("");
-        setNuevoTelefono("");
-        setNuevoPuesto("");
-        setModalNuevoVisible(false);
-      } catch (error) {
-        console.error("Error al agregar el personal:", error);
-        Alert.alert("Error", "No se pudo agregar el personal. Verifica los datos e inténtalo nuevamente.");
-      }
+    if (!nuevoNombre.trim() || !nuevoApellido.trim() || !nuevoCorreo.trim() || !nuevoTelefono.trim() || !nuevoPuesto.trim()) {
+      Alert.alert("Error", "Todos los campos son obligatorios");
+      return;
+    }
+
+    const nuevo = {
+      nombre: nuevoNombre.trim(),
+      apellido: nuevoApellido.trim(),
+      correo: nuevoCorreo.trim(),
+      telefono: nuevoTelefono.trim(),
+      puesto: nuevoPuesto.trim(),
     };
 
-  return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-1 px-4 pt-6 bg-white">
-        <BackButton />
-        <Text className="mb-4 text-xl font-bold text-blue-900">Personal</Text>
+    try {
+      const response = await axios.post<{ id: string }>(`${API_URL}/personal`, nuevo);
 
-        {loading ? (
-          <Text className="text-center text-gray-500">Cargando...</Text>
-        ) : (
-          <FlatList
-            data={personal}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View className="p-4 mb-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <View className="flex-row items-start justify-between">
-                  <View>
-                    <Text className="text-base font-semibold text-gray-800">
-                      {item.nombre} {item.apellido}
-                    </Text>
-                    <Text className="text-sm text-gray-600">Matrícula: {item.id}</Text>
-                    <Text className="text-sm text-gray-600">{item.correo}</Text>
-                    <Text className="text-sm text-gray-600">{item.telefono}</Text>
-                    <Text className="text-sm text-gray-600">{item.puesto}</Text>
-                  </View>
-                  <View className="flex-row space-x-3">
-                    <TouchableOpacity onPress={() => abrirEditor(item)}>
-                      <Feather name="edit" size={20} color="#3b82f6" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => eliminarPersonal(item.id)}>
-                      <Feather name="trash-2" size={20} color="#ef4444" />
-                    </TouchableOpacity>
+      // Verifica si el backend devuelve un id
+      if (!response.data.id) {
+        throw new Error("El backend no devolvió un ID para el nuevo personal.");
+      }
+
+      // Actualiza el estado local con el nuevo registro
+      setPersonal((prev) => [...prev, { ...nuevo, id: response.data.id }]);
+
+      // Limpia los campos del formulario y cierra el modal
+      setNuevoNombre("");
+      setNuevoApellido("");
+      setNuevoCorreo("");
+      setNuevoTelefono("");
+      setNuevoPuesto("");
+      setModalNuevoVisible(false);
+    } catch (error) {
+      console.error("Error al agregar el personal:", error);
+      Alert.alert("Error", "No se pudo agregar el personal. Verifica los datos e inténtalo nuevamente.");
+    }
+  };
+
+  return (
+    <ProtectedRoute> {/* Envuelve el contenido con ProtectedRoute */}
+      <SafeAreaView className="flex-1 bg-white">
+        <View className="flex-1 px-4 pt-6 bg-white">
+          <BackButton />
+          <Text className="mb-4 text-xl font-bold text-blue-900">Personal</Text>
+
+          {loading ? (
+            <Text className="text-center text-gray-500">Cargando...</Text>
+          ) : (
+            <FlatList
+              data={personal}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View className="p-4 mb-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                  <View className="flex-row items-start justify-between">
+                    <View>
+                      <Text className="text-base font-semibold text-gray-800">
+                        {item.nombre} {item.apellido}
+                      </Text>
+                      <Text className="text-sm text-gray-600">Matrícula: {item.id}</Text>
+                      <Text className="text-sm text-gray-600">{item.correo}</Text>
+                      <Text className="text-sm text-gray-600">{item.telefono}</Text>
+                      <Text className="text-sm text-gray-600">{item.puesto}</Text>
+                    </View>
+                    <View className="flex-row space-x-3">
+                      <TouchableOpacity onPress={() => abrirEditor(item)}>
+                        <Feather name="edit" size={20} color="#3b82f6" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => eliminarPersonal(item.id)}>
+                        <Feather name="trash-2" size={20} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
-            )}
-          />
-        )}
+              )}
+            />
+          )}
 
-        <View className="mt-6">
-          <TouchableOpacity
-            className="items-center py-3 bg-blue-800 rounded-md"
-            onPress={() => setModalNuevoVisible(true)}
-          >
-            <Text className="text-base font-bold text-white">
-              + Nuevo Personal
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View className="mt-6">
-          <TouchableOpacity
-            className="items-center py-3 bg-gray-800 rounded-md"
-            onPress={() => router.push("/")}
-          >
-            <Text className="text-base font-bold text-white">Volver a la Página Principal</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Modal editar */}
-        <Modal visible={modalVisible} transparent animationType="slide">
-          <View className="items-center justify-center flex-1 px-4 bg-black/30">
-            <View className="w-full p-6 bg-white rounded-xl">
-              <Text className="mb-4 text-lg font-bold text-blue-900">
-                Editar Personal
+          <View className="mt-6">
+            <TouchableOpacity
+              className="items-center py-3 bg-blue-800 rounded-md"
+              onPress={() => setModalNuevoVisible(true)}
+            >
+              <Text className="text-base font-bold text-white">
+                + Nuevo Personal
               </Text>
+            </TouchableOpacity>
+          </View>
 
-              <TextInput
-                value={editItem?.nombre}
-                onChangeText={(text) => setEditItem({ ...editItem, nombre: text })}
-                placeholder="Nombre"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
+          <View className="mt-6">
+            <TouchableOpacity
+              className="items-center py-3 bg-gray-800 rounded-md"
+              onPress={() => router.push("/")}
+            >
+              <Text className="text-base font-bold text-white">Volver a la Página Principal</Text>
+            </TouchableOpacity>
+          </View>
 
-              <TextInput
-                value={editItem?.apellido}
-                onChangeText={(text) =>
-                  setEditItem({ ...editItem, apellido: text })
-                }
-                placeholder="Apellido"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
+          {/* Modal editar */}
+          <Modal visible={modalVisible} transparent animationType="slide">
+            <View className="items-center justify-center flex-1 px-4 bg-black/30">
+              <View className="w-full p-6 bg-white rounded-xl">
+                <Text className="mb-4 text-lg font-bold text-blue-900">
+                  Editar Personal
+                </Text>
 
-              <TextInput
-                value={editItem?.correo}
-                onChangeText={(text) =>
-                  setEditItem({ ...editItem, correo: text })
-                }
-                placeholder="Correo"
-                keyboardType="email-address"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
+                <TextInput
+                  value={editItem?.nombre}
+                  onChangeText={(text) => setEditItem({ ...editItem, nombre: text })}
+                  placeholder="Nombre"
+                  className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+                />
 
-              <TextInput
-                value={editItem?.telefono}
-                onChangeText={(text) =>
-                  setEditItem({ ...editItem, telefono: text })
-                }
-                placeholder="Teléfono"
-                keyboardType="phone-pad"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
+                <TextInput
+                  value={editItem?.apellido}
+                  onChangeText={(text) =>
+                    setEditItem({ ...editItem, apellido: text })
+                  }
+                  placeholder="Apellido"
+                  className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+                />
 
-              <TextInput
-                value={editItem?.puesto}
-                onChangeText={(text) =>
-                  setEditItem({ ...editItem, puesto: text })
-                }
-                placeholder="Puesto"
-                className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
-              />
+                <TextInput
+                  value={editItem?.correo}
+                  onChangeText={(text) =>
+                    setEditItem({ ...editItem, correo: text })
+                  }
+                  placeholder="Correo"
+                  keyboardType="email-address"
+                  className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+                />
 
-              <View className="flex-row justify-end space-x-3">
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Text className="font-semibold text-gray-600">Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={guardarEdicion}>
-                  <Text className="font-bold text-blue-600">Guardar</Text>
-                </TouchableOpacity>
+                <TextInput
+                  value={editItem?.telefono}
+                  onChangeText={(text) =>
+                    setEditItem({ ...editItem, telefono: text })
+                  }
+                  placeholder="Teléfono"
+                  keyboardType="phone-pad"
+                  className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+                />
+
+                <TextInput
+                  value={editItem?.puesto}
+                  onChangeText={(text) =>
+                    setEditItem({ ...editItem, puesto: text })
+                  }
+                  placeholder="Puesto"
+                  className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
+                />
+
+                <View className="flex-row justify-end space-x-3">
+                  <TouchableOpacity onPress={() => setModalVisible(false)}>
+                    <Text className="font-semibold text-gray-600">Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={guardarEdicion}>
+                    <Text className="font-bold text-blue-600">Guardar</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
 
-        {/* Modal nuevo personal */}
-        <Modal visible={modalNuevoVisible} transparent animationType="slide">
-          <View className="items-center justify-center flex-1 px-4 bg-black/30">
-            <View className="w-full p-6 bg-white rounded-xl">
-              <Text className="mb-4 text-lg font-bold text-blue-900">
-                Nuevo Personal
-              </Text>
+          {/* Modal nuevo personal */}
+          <Modal visible={modalNuevoVisible} transparent animationType="slide">
+            <View className="items-center justify-center flex-1 px-4 bg-black/30">
+              <View className="w-full p-6 bg-white rounded-xl">
+                <Text className="mb-4 text-lg font-bold text-blue-900">
+                  Nuevo Personal
+                </Text>
 
-              <TextInput
-                value={nuevoNombre}
-                onChangeText={setNuevoNombre}
-                placeholder="Nombre"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
-              <TextInput
-                value={nuevoApellido}
-                onChangeText={setNuevoApellido}
-                placeholder="Apellido"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
-              <TextInput
-                value={nuevoCorreo}
-                onChangeText={setNuevoCorreo}
-                placeholder="Correo"
-                keyboardType="email-address"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
-              <TextInput
-                value={nuevoTelefono}
-                onChangeText={setNuevoTelefono}
-                placeholder="Teléfono"
-                keyboardType="phone-pad"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
-              <TextInput
-                value={nuevoPuesto}
-                onChangeText={setNuevoPuesto}
-                placeholder="Puesto"
-                className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
-              />
+                <TextInput
+                  value={nuevoNombre}
+                  onChangeText={setNuevoNombre}
+                  placeholder="Nombre"
+                  className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+                />
+                <TextInput
+                  value={nuevoApellido}
+                  onChangeText={setNuevoApellido}
+                  placeholder="Apellido"
+                  className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+                />
+                <TextInput
+                  value={nuevoCorreo}
+                  onChangeText={setNuevoCorreo}
+                  placeholder="Correo"
+                  keyboardType="email-address"
+                  className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+                />
+                <TextInput
+                  value={nuevoTelefono}
+                  onChangeText={setNuevoTelefono}
+                  placeholder="Teléfono"
+                  keyboardType="phone-pad"
+                  className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
+                />
+                <TextInput
+                  value={nuevoPuesto}
+                  onChangeText={setNuevoPuesto}
+                  placeholder="Puesto"
+                  className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
+                />
 
-              <View className="flex-row justify-end space-x-3">
-                <TouchableOpacity onPress={() => setModalNuevoVisible(false)}>
-                  <Text className="font-semibold text-gray-600">Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={agregarPersonal}>
-                  <Text className="font-bold text-blue-600">Agregar</Text>
-                </TouchableOpacity>
+                <View className="flex-row justify-end space-x-3">
+                  <TouchableOpacity onPress={() => setModalNuevoVisible(false)}>
+                    <Text className="font-semibold text-gray-600">Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={agregarPersonal}>
+                    <Text className="font-bold text-blue-600">Agregar</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-      </View>
-    </SafeAreaView>
+          </Modal>
+        </View>
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }

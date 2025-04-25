@@ -1,12 +1,15 @@
 import { Stack } from "expo-router";
+import { AuthProvider } from "./authContext";
 import "./globals.css";
 
 export default function RootLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false, // Esto oculta el título como "index"
-      }}
-    />
+    <AuthProvider>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+        }}
+      />
+    </AuthProvider>
   );
 }
