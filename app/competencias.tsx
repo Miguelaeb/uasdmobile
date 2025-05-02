@@ -1,202 +1,209 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  FlatList,
-  TouchableOpacity,
-  Modal,
   TextInput,
+  TouchableOpacity,
+  ScrollView,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
-const competenciasEjemplo = [
-  {
-    id: "CT1",
-    nombre: "Competencia Técnica",
-    descripcion: "Descripción técnica",
-  },
-];
+const API_BASE_URL = "http://localhost:8081"; // Reemplaza con la URL de tu backend
+
+const BackButton = () => {
+  const router = useRouter();
+  return (
+    <TouchableOpacity onPress={() => router.push("/")} className="flex-row items-center p-2">
+      <Feather name="arrow-left" size={24} color="#3b82f6" />
+      <Text className="ml-2 text-blue-600 font-semibold">Volver</Text>
+    </TouchableOpacity>
+  );
+};
+
+interface Competencia {
+  id: number;
+  nombre: string;
+  descripcion: string;
+}
 
 export default function CompetenciasScreen() {
-  const [competencias, setCompetencias] = useState(competenciasEjemplo);
+  const [nombre, setNombre] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [competencias, setCompetencias] = useState<Competencia[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<null | string>(null);
 
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editItem, setEditItem] = useState<any>(null);
+  useEffect(() => {
+    fetchCompetencias();
+  }, []);
 
-  const [modalNuevoVisible, setModalNuevoVisible] = useState(false);
-  const [nuevoId, setNuevoId] = useState("");
-  const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevoDescripcion, setNuevoDescripcion] = useState("");
-
-  const eliminarCompetencia = (id: string) => {
-    setCompetencias(competencias.filter((c) => c.id !== id));
+  const fetchCompetencias = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/competencias`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data: Competencia[] = await response.json();
+      setCompetencias(data);
+      setError(null);
+    } catch (err: any) {
+      setError("Error al cargar las competencias.");
+      console.error("Error fetching competencias:", err.message);
+    }
   };
 
-  const abrirEditor = (item: any) => {
-    setEditItem(item);
-    setModalVisible(true);
+  const handleCrearCompetencia = async () => {
+    if (!nombre || !descripcion) {
+      Alert.alert("Error", "Nombre y descripción son obligatorios");
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/competencias`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ nombre, descripcion }),
+      });
+
+      if (response.ok) {
+        Alert.alert("Éxito", "Competencia agregada correctamente");
+        setNombre("");
+        setDescripcion("");
+        fetchCompetencias(); // Recargar la lista
+      } else {
+        const errorData = await response.text();
+        Alert.alert("Error", errorData || "No se pudo agregar la competencia");
+      }
+    } catch (err: any) {
+      Alert.alert("Error", "Error al conectar con el servidor");
+      console.error("Error creating competencia:", err.message);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const guardarEdicion = () => {
-    setCompetencias((prev) =>
-      prev.map((c) => (c.id === editItem.id ? editItem : c))
+  const handleDeleteCompetencia = async (id: number) => {
+    Alert.alert(
+      "Confirmar",
+      `¿Seguro que deseas eliminar esta competencia?`,
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_BASE_URL}/competencias/${id}`, {
+                method: "DELETE",
+              });
+              if (response.ok) {
+                Alert.alert("Éxito", "Competencia eliminada correctamente");
+                fetchCompetencias(); // Recargar la lista
+              } else {
+                const errorData = await response.text();
+                Alert.alert(
+                  "Error",
+                  errorData || "No se pudo eliminar la competencia"
+                );
+              }
+            } catch (err: any) {
+              Alert.alert("Error", "Error al conectar con el servidor");
+              console.error("Error deleting competencia:", err.message);
+            }
+          },
+        },
+      ]
     );
-    setModalVisible(false);
-  };
-
-  const agregarCompetencia = () => {
-    if (!nuevoId || !nuevoNombre || !nuevoDescripcion) {
-      Alert.alert("Todos los campos son obligatorios");
-      return;
-    }
-
-    const yaExiste = competencias.find((c) => c.id === nuevoId);
-    if (yaExiste) {
-      Alert.alert("Ya existe una competencia con ese ID");
-      return;
-    }
-
-    const nueva = {
-      id: nuevoId,
-      nombre: nuevoNombre,
-      descripcion: nuevoDescripcion,
-    };
-
-    setCompetencias([...competencias, nueva]);
-    setModalNuevoVisible(false);
-    setNuevoId("");
-    setNuevoNombre("");
-    setNuevoDescripcion("");
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-1 px-4 pt-6 bg-white">
-        <Text className="mb-4 text-xl font-bold text-blue-900">
-          Competencias
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 24,
+          paddingBottom: 40,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <BackButton/>
+
+        <Text className="mb-6 text-xl font-bold text-blue-900">
+          Gestión de Competencias
         </Text>
 
-        <FlatList
-          data={competencias}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View className="p-4 mb-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1 pr-2">
-                  <Text className="text-base font-semibold text-gray-800">
-                    {item.nombre}
-                  </Text>
-                  <Text className="text-sm text-gray-500">
-                    {item.descripcion}
-                  </Text>
-                </View>
-                <View className="flex-row space-x-3">
-                  <TouchableOpacity onPress={() => abrirEditor(item)}>
-                    <Feather name="edit" size={20} color="#3b82f6" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => eliminarCompetencia(item.id)}
-                  >
-                    <Feather name="trash-2" size={20} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
+        {/* Formulario para crear nueva competencia */}
+        <Text className="mb-1 text-sm text-gray-700">Nombre de la Competencia</Text>
+        <TextInput
+          className="p-3 mb-4 border border-gray-300 rounded-md"
+          placeholder="Ej. Comunicación efectiva"
+          value={nombre}
+          onChangeText={setNombre}
         />
 
-        <View className="mt-6">
-          <TouchableOpacity
-            className="items-center py-3 bg-blue-800 rounded-md"
-            onPress={() => setModalNuevoVisible(true)}
-          >
-            <Text className="text-base font-bold text-white">
-              + Nueva Competencia
-            </Text>
-          </TouchableOpacity>
+        <Text className="mb-1 text-sm text-gray-700">Descripción</Text>
+        <TextInput
+          className="p-3 mb-6 border border-gray-300 rounded-md"
+          placeholder="Descripción de la competencia"
+          multiline
+          value={descripcion}
+          onChangeText={setDescripcion}
+        />
+
+        <TouchableOpacity
+          className={`items-center py-3 bg-blue-800 rounded-md ${
+            isCreating ? "opacity-50" : ""
+          }`}
+          onPress={handleCrearCompetencia}
+          disabled={isCreating}
+        >
+          <Text className="text-base font-bold text-white">
+            {isCreating ? "Creando..." : "Agregar Competencia"}
+          </Text>
+        </TouchableOpacity>
+
+        {error && (
+          <View className="mt-4 p-2 bg-red-200 rounded-md">
+            <Text className="text-red-600">{error}</Text>
+          </View>
+        )}
+
+        {/* Lista de competencias */}
+        <View className="mt-8">
+          <Text className="mb-4 text-lg font-semibold text-gray-800">
+            Lista de Competencias
+          </Text>
+          {competencias.length === 0 ? (
+            <Text className="text-gray-600">No hay competencias registradas.</Text>
+          ) : (
+            competencias.map((comp) => (
+              <View
+                key={comp.id}
+                className="flex-row items-center justify-between py-2 border-b border-gray-200"
+              >
+                <View className="flex-1 mr-4">
+                  <Text className="font-semibold">{comp.nombre}</Text>
+                  <Text className="text-gray-600">{comp.descripcion}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => handleDeleteCompetencia(comp.id)}
+                >
+                  <Feather name="trash-2" size={20} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
         </View>
-
-        {/* Modal Editar Competencia */}
-        <Modal visible={modalVisible} transparent animationType="slide">
-          <View className="items-center justify-center flex-1 px-4 bg-black/30">
-            <View className="w-full p-6 bg-white rounded-xl">
-              <Text className="mb-4 text-lg font-bold text-blue-900">
-                Editar Competencia
-              </Text>
-
-              <TextInput
-                value={editItem?.nombre}
-                onChangeText={(text) =>
-                  setEditItem({ ...editItem, nombre: text })
-                }
-                placeholder="Nombre"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
-
-              <TextInput
-                value={editItem?.descripcion}
-                onChangeText={(text) =>
-                  setEditItem({ ...editItem, descripcion: text })
-                }
-                placeholder="Descripción"
-                className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
-              />
-
-              <View className="flex-row justify-end space-x-3">
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Text className="font-semibold text-gray-600">Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={guardarEdicion}>
-                  <Text className="font-bold text-blue-600">Guardar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Modal Nueva Competencia */}
-        <Modal visible={modalNuevoVisible} transparent animationType="slide">
-          <View className="items-center justify-center flex-1 px-4 bg-black/30">
-            <View className="w-full p-6 bg-white rounded-xl">
-              <Text className="mb-4 text-lg font-bold text-blue-900">
-                Nueva Competencia
-              </Text>
-
-              <TextInput
-                value={nuevoId}
-                onChangeText={setNuevoId}
-                placeholder="ID (ej. CT2)"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
-
-              <TextInput
-                value={nuevoNombre}
-                onChangeText={setNuevoNombre}
-                placeholder="Nombre"
-                className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
-              />
-
-              <TextInput
-                value={nuevoDescripcion}
-                onChangeText={setNuevoDescripcion}
-                placeholder="Descripción"
-                className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
-              />
-
-              <View className="flex-row justify-end space-x-3">
-                <TouchableOpacity onPress={() => setModalNuevoVisible(false)}>
-                  <Text className="font-semibold text-gray-600">Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={agregarCompetencia}>
-                  <Text className="font-bold text-blue-600">Agregar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

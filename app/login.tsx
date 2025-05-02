@@ -11,7 +11,7 @@ export default function Login() {
   const handleLogin = async () => {
     if (email && password) {
       try {
-        const response = await fetch("http://localhost:4000/login", {
+        const response = await fetch("http://localhost:8081/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
@@ -19,7 +19,16 @@ export default function Login() {
 
         if (response.ok) {
           const data = await response.json();
-          login(data.token); // Llama a la función login del contexto
+          if (data.token) {
+            login(data.token, {
+              name: data.user.nombre,
+              lastName: data.user.apellido,
+              email: data.user.email,
+              photo: data.user.photo || null, // Asegúrate de incluir la foto si está disponible
+            });
+          } else {
+            alert("Error al iniciar sesión. Inténtalo de nuevo.");
+          }
         } else {
           const errorData = await response.json();
           alert(errorData.error || "Error al iniciar sesión.");

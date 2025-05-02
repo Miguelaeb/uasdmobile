@@ -3,6 +3,8 @@ const express = require("express");
 const sql = require("mssql");
 const dbConfig = require("../config/dbConfig");
 
+const API_URL = "http://localhost:8081"; // Asegúrate de que esta IP sea correcta
+
 const router = express.Router();
 
 // Ruta: Obtener todas las asignaturas
@@ -157,6 +159,18 @@ router.delete("/:id", async (req, res) => {
     } catch (err) {
         console.error("Error al eliminar la asignatura:", err.message);
         res.status(500).send("Error al eliminar la asignatura");
+    }
+});
+
+// Ruta: Obtener todos los planes
+router.get("/planes", async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query("SELECT * FROM Planes");
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("Error al obtener planes:", err.message);
+        res.status(500).send("Error al obtener planes");
     }
 });
 

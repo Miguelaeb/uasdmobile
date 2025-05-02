@@ -52,7 +52,7 @@ export default function AsignaturasScreen() {
   const [nuevoSemestre, setNuevoSemestre] = useState("");
   const [nuevoEquivalente, setNuevoEquivalente] = useState("");
 
-  const API_URL = "http://localhost:4000"; // Cambia esto si tu backend está en otro lugar
+  const API_URL = "http://localhost:8081"; // Cambia esta IP por la de tu máquina
 
   // Obtener asignaturas y planes desde la base de datos
   useEffect(() => {
@@ -170,12 +170,10 @@ export default function AsignaturasScreen() {
   };
 
   return (
-    <ProtectedRoute> {/* Envuelve el contenido con ProtectedRoute */}
+    <ProtectedRoute>
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 px-4 pt-6 bg-white">
-          <Text className="mb-4 text-xl font-bold text-blue-900">
-            Asignaturas
-          </Text>
+          <Text className="mb-4 text-xl font-bold text-blue-900">Asignaturas</Text>
           <BackButton />
 
           {/* Selector de plan */}
@@ -208,30 +206,24 @@ export default function AsignaturasScreen() {
                       Créditos: <Text className="font-normal">{item.creditos}</Text>
                     </Text>
                     <Text className="text-sm font-bold text-gray-700">
-                      Horas Prácticas:{" "}
-                      <Text className="font-normal">{item.horasPracticas}</Text>
+                      Horas Prácticas: <Text className="font-normal">{item.horasPracticas}</Text>
                     </Text>
                     <Text className="text-sm font-bold text-gray-700">
-                      Horas Teóricas:{" "}
-                      <Text className="font-normal">{item.horasTeoricas}</Text>
+                      Horas Teóricas: <Text className="font-normal">{item.horasTeoricas}</Text>
                     </Text>
                     <Text className="text-sm font-bold text-gray-700">
-                      Prerrequisitos:{" "}
-                      <Text className="font-normal">{item.prerequisitos}</Text>
+                      Prerrequisitos: <Text className="font-normal">{item.prerequisitos}</Text>
                     </Text>
                     <Text className="text-sm font-bold text-gray-700">
                       Semestre: <Text className="font-normal">{item.semestre}</Text>
                     </Text>
                     <Text className="text-sm font-bold text-gray-700">
-                      Equivalente:{" "}
-                      <Text className="font-normal">{item.equivalente}</Text>
+                      Equivalente: <Text className="font-normal">{item.equivalente}</Text>
                     </Text>
 
                     {/* Botones de eliminar */}
                     <View className="flex-row justify-end mt-2 space-x-3">
-                      <TouchableOpacity
-                        onPress={() => eliminarAsignatura(item.id)}
-                      >
+                      <TouchableOpacity onPress={() => eliminarAsignatura(item.id)}>
                         <Feather name="trash-2" size={20} color="#ef4444" />
                       </TouchableOpacity>
                     </View>
@@ -243,15 +235,11 @@ export default function AsignaturasScreen() {
                 className="items-center py-3 mt-6 bg-blue-800 rounded-md"
                 onPress={() => setModalNuevaVisible(true)}
               >
-                <Text className="text-base font-bold text-white">
-                  + Nueva Asignatura
-                </Text>
+                <Text className="text-base font-bold text-white">+ Nueva Asignatura</Text>
               </TouchableOpacity>
             </>
           ) : (
-            <Text className="text-center text-gray-500">
-              Selecciona un plan para ver o agregar asignaturas.
-            </Text>
+            <Text className="text-gray-500">Selecciona un plan para ver o agregar asignaturas.</Text>
           )}
 
           <View className="mt-6">
@@ -267,9 +255,7 @@ export default function AsignaturasScreen() {
           <Modal visible={modalNuevaVisible} transparent animationType="slide">
             <View className="items-center justify-center flex-1 px-4 bg-black/30">
               <View className="w-full p-6 bg-white rounded-xl">
-                <Text className="mb-4 text-lg font-bold text-blue-900">
-                  Nueva Asignatura
-                </Text>
+                <Text className="mb-4 text-lg font-bold text-blue-900">Nueva Asignatura</Text>
 
                 {/* Campos para nueva asignatura */}
                 <Text className="mb-1 text-sm text-gray-700">Código</Text>

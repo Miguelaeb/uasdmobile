@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
 } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
-import { useAuth } from "./authContext"; // Importa el contexto de autenticación
+import { useAuth } from "./authContext";
 
 const dashboardCards = [
   {
@@ -53,7 +53,7 @@ const dashboardCards = [
     label: "Competencias",
     icon: <FontAwesome5 name="tasks" size={22} color="#eab308" />,
     color: "#fef9c3",
-    href: "/configuracion", // Updated to match the expected type
+    href: "/competencias",
   },
   {
     label: "Educación Virtual",
@@ -71,23 +71,33 @@ const dashboardCards = [
     label: "Pago en Línea",
     icon: <MaterialIcons name="payment" size={22} color="#22c55e" />,
     color: "#dcfce7",
-    href: "/pago_en_linea", // Ruta de la nueva página
+    href: "/pago_en_linea",
   },
 ] as const;
 
 export default function Home() {
-  const { isAuthenticated, logout } = useAuth(); // Usa el contexto de autenticación
+  const { user, logout } = useAuth();
   const router = useRouter();
+  const [currentDateTime, setCurrentDateTime] = useState("");
 
-  // Datos dinámicos del usuario
-  const [photo, setPhoto] = useState<string | null>("https://randomuser.me/api/portraits/men/32.jpg");
-  const [name, setName] = useState("Miguel");
-  const [lastName, setLastName] = useState("Evangelista");
+  useEffect(() => {
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const formattedTime = now.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    setCurrentDateTime(`${formattedDate}, ${formattedTime}`);
+  }, []);
 
-  const handleLogout = () => {
-    logout(); // Llama a la función de cerrar sesión
-    router.replace("/login"); // Redirige al login
-  };
+  if (!user) {
+    return null;
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -103,10 +113,12 @@ export default function Home() {
           <View>
             <Text className="text-sm text-gray-500">Hola,</Text>
             <Text className="text-2xl font-bold text-blue-900">
-              {name} {lastName}
+              {user.name} {user.lastName}
             </Text>
+            {/* Fecha y hora actual */}
+            <Text className="mt-1 text-sm text-gray-500">{currentDateTime}</Text>
           </View>
-          <TouchableOpacity onPress={handleLogout} className="items-center justify-center w-10 h-10 bg-red-100 rounded-full">
+          <TouchableOpacity onPress={logout} className="items-center justify-center w-10 h-10 bg-red-100 rounded-full">
             <AntDesign name="logout" size={20} color="#dc2626" />
           </TouchableOpacity>
         </View>
@@ -117,15 +129,15 @@ export default function Home() {
             <View className="flex-row items-center">
               <Image
                 source={{
-                  uri: photo || "https://via.placeholder.com/150",
+                  uri: user.photo || "https://via.placeholder.com/150",
                 }}
                 className="w-10 h-10 mr-3 rounded-full"
               />
               <View>
                 <Text className="text-base font-bold text-white">
-                  {name} {lastName}
+                  {user.name} {user.lastName}
                 </Text>
-                <Text className="text-sm text-blue-100">Front End Developer</Text>
+                <Text className="text-sm text-blue-100">{user.email}</Text>
               </View>
             </View>
             <Feather name="chevron-right" size={20} color="white" />
@@ -134,11 +146,7 @@ export default function Home() {
           <View className="flex-row justify-between pt-3 border-t border-blue-400">
             <View className="flex-row items-center">
               <Feather name="calendar" size={16} color="white" />
-              <Text className="ml-2 text-sm text-white">Miércoles, 2 Abril</Text>
-            </View>
-            <View className="flex-row items-center">
-              <Feather name="clock" size={16} color="white" />
-              <Text className="ml-2 text-sm text-white">11:00 – 12:00 AM</Text>
+              <Text className="ml-2 text-sm text-white">{currentDateTime}</Text>
             </View>
           </View>
         </View>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,9 +9,11 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { ProtectedRoute } from "./protectedRoute"; // Importa el componente ProtectedRoute
+
+const API_BASE_URL = "http://localhost:8081"; // Reemplaza con la URL de tu backend
 
 const BackButton = () => {
   const router = useRouter();
@@ -24,16 +26,38 @@ const BackButton = () => {
 };
 
 export default function NuevoPlan() {
+  const router = useRouter();
   const [nombre, setNombre] = useState("");
   const [codigo, setCodigo] = useState("");
   const [competencia, setCompetencia] = useState("");
+  const [competencias, setCompetencias] = useState<{ id: string; nombre: string }[]>([]); // Estado para almacenar las competencias
+  const [loading, setLoading] = useState(true); // Estado para manejar el estado de carga
 
-  // Opciones de competencias
-  const competencias = [
-    { label: "Competencia Técnica", value: "CT" },
-    { label: "Competencia Profesional", value: "CP" },
-    { label: "Competencia Genérica", value: "CG" },
-  ];
+  // Función para obtener las competencias desde el backend
+  const fetchCompetencias = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/competencias`);
+      if (!response.ok) {
+        throw new Error(`Error al obtener competencias: ${response.status}`);
+      }
+      const data = await response.json();
+      setCompetencias(data);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error("Error al obtener competencias:", error.message);
+      } else {
+        console.error("Error al obtener competencias:", error);
+      }
+      Alert.alert("Error", "No se pudieron cargar las competencias");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // useEffect para cargar las competencias al montar el componente
+  useEffect(() => {
+    fetchCompetencias();
+  }, []);
 
   const handleCrear = async () => {
     if (!nombre || !codigo || !competencia) {
@@ -44,11 +68,11 @@ export default function NuevoPlan() {
     const nuevoPlan = {
       nombre,
       codigo,
-      competencia,
+      id_competencia: competencia,
     };
 
     try {
-      const response = await fetch("http://localhost:4000/planes", {
+      const response = await fetch(`${API_BASE_URL}/planes`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,6 +85,7 @@ export default function NuevoPlan() {
         setNombre("");
         setCodigo("");
         setCompetencia("");
+        router.push("/mis-planes"); // Redirige a la pantalla de "Mis Planes"
       } else {
         const errorData = await response.json();
         Alert.alert("Error", errorData.message || "No se pudo crear el plan");
@@ -72,7 +97,7 @@ export default function NuevoPlan() {
   };
 
   return (
-    <ProtectedRoute> {/* Envuelve el contenido con ProtectedRoute */}
+    <ProtectedRoute>
       <SafeAreaView className="flex-1 bg-white">
         <ScrollView
           contentContainerStyle={{
@@ -83,6 +108,7 @@ export default function NuevoPlan() {
           showsVerticalScrollIndicator={false}
         >
           <BackButton />
+
           {/* Título de la pantalla */}
           <Text className="mb-6 text-xl font-bold text-blue-900">
             Ingresar Plan de Estudio
@@ -98,19 +124,21 @@ export default function NuevoPlan() {
           />
 
           {/* Selector de competencia */}
-          <Text className="mb-1 text-sm text-gray-700">
-            Seleccione Competencia
-          </Text>
+          <Text className="mb-1 text-sm text-gray-700">Seleccione Competencia</Text>
           <View className="mb-4 border border-gray-300 rounded-md">
-            <Picker
-              selectedValue={competencia}
-              onValueChange={(itemValue) => setCompetencia(itemValue)}
-            >
-              <Picker.Item label="Seleccionar..." value="" />
-              {competencias.map((comp, index) => (
-                <Picker.Item key={index} label={comp.label} value={comp.value} />
-              ))}
-            </Picker>
+            {loading ? (
+              <Text className="text-gray-500 p-3">Cargando competencias...</Text>
+            ) : (
+              <Picker
+                selectedValue={competencia}
+                onValueChange={(itemValue) => setCompetencia(itemValue)}
+              >
+                <Picker.Item label="Seleccionar..." value="" />
+                {competencias.map((comp) => (
+                  <Picker.Item key={comp.id} label={comp.nombre} value={comp.id} />
+                ))}
+              </Picker>
+            )}
           </View>
 
           {/* Campo para el código del plan */}
@@ -130,6 +158,7 @@ export default function NuevoPlan() {
             <Text className="text-base font-bold text-white">Crear</Text>
           </TouchableOpacity>
 
+          {/* Botón para volver a la página principal */}
           <View className="mt-6">
             <TouchableOpacity
               className="items-center py-3 bg-gray-800 rounded-md"

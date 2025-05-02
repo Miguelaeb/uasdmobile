@@ -14,7 +14,7 @@ import axios from "axios";
 import { useRouter } from "expo-router";
 import { ProtectedRoute } from "./protectedRoute"; // Importa el componente ProtectedRoute
 
-const API_URL = "http://localhost:4000"; // Cambia esto si tu backend está en otro lugar
+const API_URL = "http://localhost:8081"; // Cambia esto si tu backend está en otro lugar
 
 const BackButton = () => {
   const router = useRouter();
@@ -43,7 +43,7 @@ export default function PersonalScreen() {
 
   // Modal editar
   const [modalVisible, setModalVisible] = useState(false);
-  const [editItem, setEditItem] = useState<any>(null);
+  const [editItem, setEditItem] = useState<Personal | null>(null);
 
   // Modal nuevo
   const [modalNuevoVisible, setModalNuevoVisible] = useState(false);
@@ -71,32 +71,30 @@ export default function PersonalScreen() {
   }, []);
 
   const eliminarPersonal = async (id: string) => {
-    console.log("ID a eliminar:", id); // Depuración
     try {
       await axios.delete(`${API_URL}/personal/${id}`);
       setPersonal((prev) => prev.filter((p) => p.id !== id));
+      Alert.alert("Éxito", "Personal eliminado exitosamente.");
     } catch (error) {
       console.error("Error al eliminar el personal:", error);
       Alert.alert("Error", "No se pudo eliminar el personal.");
     }
   };
 
-  const abrirEditor = (item: any) => {
+  const abrirEditor = (item: Personal) => {
     setEditItem(item);
     setModalVisible(true);
   };
 
   const guardarEdicion = async () => {
-    console.log("Datos a guardar:", editItem); // Depuración
+    if (!editItem) return;
+
     try {
       await axios.put(`${API_URL}/personal/${editItem.id}`, editItem);
-
-      // Recarga los datos desde el backend
       await fetchPersonal();
-
-      // Limpia el estado y cierra el modal
       setEditItem(null);
       setModalVisible(false);
+      Alert.alert("Éxito", "Personal actualizado exitosamente.");
     } catch (error) {
       console.error("Error al guardar la edición:", error);
       Alert.alert("Error", "No se pudo guardar la edición.");
@@ -104,8 +102,8 @@ export default function PersonalScreen() {
   };
 
   const agregarPersonal = async () => {
-    if (!nuevoNombre.trim() || !nuevoApellido.trim() || !nuevoCorreo.trim() || !nuevoTelefono.trim() || !nuevoPuesto.trim()) {
-      Alert.alert("Error", "Todos los campos son obligatorios");
+    if (!nuevoNombre || !nuevoApellido || !nuevoCorreo || !nuevoTelefono || !nuevoPuesto) {
+      Alert.alert("Error", "Todos los campos son obligatorios.");
       return;
     }
 
@@ -119,30 +117,22 @@ export default function PersonalScreen() {
 
     try {
       const response = await axios.post<{ id: string }>(`${API_URL}/personal`, nuevo);
-
-      // Verifica si el backend devuelve un id
-      if (!response.data.id) {
-        throw new Error("El backend no devolvió un ID para el nuevo personal.");
-      }
-
-      // Actualiza el estado local con el nuevo registro
       setPersonal((prev) => [...prev, { ...nuevo, id: response.data.id }]);
-
-      // Limpia los campos del formulario y cierra el modal
       setNuevoNombre("");
       setNuevoApellido("");
       setNuevoCorreo("");
       setNuevoTelefono("");
       setNuevoPuesto("");
       setModalNuevoVisible(false);
+      Alert.alert("Éxito", "Personal agregado exitosamente.");
     } catch (error) {
       console.error("Error al agregar el personal:", error);
-      Alert.alert("Error", "No se pudo agregar el personal. Verifica los datos e inténtalo nuevamente.");
+      Alert.alert("Error", "No se pudo agregar el personal.");
     }
   };
 
   return (
-    <ProtectedRoute> {/* Envuelve el contenido con ProtectedRoute */}
+    <ProtectedRoute>
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 px-4 pt-6 bg-white">
           <BackButton />
@@ -161,10 +151,9 @@ export default function PersonalScreen() {
                       <Text className="text-base font-semibold text-gray-800">
                         {item.nombre} {item.apellido}
                       </Text>
-                      <Text className="text-sm text-gray-600">Matrícula: {item.id}</Text>
-                      <Text className="text-sm text-gray-600">{item.correo}</Text>
-                      <Text className="text-sm text-gray-600">{item.telefono}</Text>
-                      <Text className="text-sm text-gray-600">{item.puesto}</Text>
+                      <Text className="text-sm text-gray-600">Correo: {item.correo}</Text>
+                      <Text className="text-sm text-gray-600">Teléfono: {item.telefono}</Text>
+                      <Text className="text-sm text-gray-600">Puesto: {item.puesto}</Text>
                     </View>
                     <View className="flex-row space-x-3">
                       <TouchableOpacity onPress={() => abrirEditor(item)}>
@@ -180,79 +169,48 @@ export default function PersonalScreen() {
             />
           )}
 
-          <View className="mt-6">
-            <TouchableOpacity
-              className="items-center py-3 bg-blue-800 rounded-md"
-              onPress={() => setModalNuevoVisible(true)}
-            >
-              <Text className="text-base font-bold text-white">
-                + Nuevo Personal
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            className="items-center py-3 mt-6 bg-blue-800 rounded-md"
+            onPress={() => setModalNuevoVisible(true)}
+          >
+            <Text className="text-base font-bold text-white">+ Nuevo Personal</Text>
+          </TouchableOpacity>
 
-          <View className="mt-6">
-            <TouchableOpacity
-              className="items-center py-3 bg-gray-800 rounded-md"
-              onPress={() => router.push("/")}
-            >
-              <Text className="text-base font-bold text-white">Volver a la Página Principal</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Modal editar */}
+          {/* Modal para editar */}
           <Modal visible={modalVisible} transparent animationType="slide">
             <View className="items-center justify-center flex-1 px-4 bg-black/30">
               <View className="w-full p-6 bg-white rounded-xl">
-                <Text className="mb-4 text-lg font-bold text-blue-900">
-                  Editar Personal
-                </Text>
-
+                <Text className="mb-4 text-lg font-bold text-blue-900">Editar Personal</Text>
                 <TextInput
                   value={editItem?.nombre}
-                  onChangeText={(text) => setEditItem({ ...editItem, nombre: text })}
+                  onChangeText={(text) => editItem && setEditItem({ ...editItem, nombre: text })}
                   placeholder="Nombre"
                   className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
                 />
-
                 <TextInput
                   value={editItem?.apellido}
-                  onChangeText={(text) =>
-                    setEditItem({ ...editItem, apellido: text })
-                  }
+                  onChangeText={(text) => editItem && setEditItem({ ...editItem, apellido: text })}
                   placeholder="Apellido"
                   className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
                 />
-
                 <TextInput
                   value={editItem?.correo}
-                  onChangeText={(text) =>
-                    setEditItem({ ...editItem, correo: text })
-                  }
+                  onChangeText={(text) => editItem && setEditItem({ ...editItem, correo: text })}
                   placeholder="Correo"
-                  keyboardType="email-address"
                   className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
                 />
-
                 <TextInput
                   value={editItem?.telefono}
-                  onChangeText={(text) =>
-                    setEditItem({ ...editItem, telefono: text })
-                  }
+                  onChangeText={(text) => editItem && setEditItem({ ...editItem, telefono: text })}
                   placeholder="Teléfono"
-                  keyboardType="phone-pad"
                   className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
                 />
-
                 <TextInput
                   value={editItem?.puesto}
-                  onChangeText={(text) =>
-                    setEditItem({ ...editItem, puesto: text })
-                  }
+                  onChangeText={(text) => editItem && setEditItem({ ...editItem, puesto: text })}
                   placeholder="Puesto"
                   className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
                 />
-
                 <View className="flex-row justify-end space-x-3">
                   <TouchableOpacity onPress={() => setModalVisible(false)}>
                     <Text className="font-semibold text-gray-600">Cancelar</Text>
@@ -265,14 +223,11 @@ export default function PersonalScreen() {
             </View>
           </Modal>
 
-          {/* Modal nuevo personal */}
+          {/* Modal para agregar */}
           <Modal visible={modalNuevoVisible} transparent animationType="slide">
             <View className="items-center justify-center flex-1 px-4 bg-black/30">
               <View className="w-full p-6 bg-white rounded-xl">
-                <Text className="mb-4 text-lg font-bold text-blue-900">
-                  Nuevo Personal
-                </Text>
-
+                <Text className="mb-4 text-lg font-bold text-blue-900">Nuevo Personal</Text>
                 <TextInput
                   value={nuevoNombre}
                   onChangeText={setNuevoNombre}
@@ -289,14 +244,12 @@ export default function PersonalScreen() {
                   value={nuevoCorreo}
                   onChangeText={setNuevoCorreo}
                   placeholder="Correo"
-                  keyboardType="email-address"
                   className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
                 />
                 <TextInput
                   value={nuevoTelefono}
                   onChangeText={setNuevoTelefono}
                   placeholder="Teléfono"
-                  keyboardType="phone-pad"
                   className="px-3 py-2 mb-4 border border-gray-300 rounded-md"
                 />
                 <TextInput
@@ -305,7 +258,6 @@ export default function PersonalScreen() {
                   placeholder="Puesto"
                   className="px-3 py-2 mb-6 border border-gray-300 rounded-md"
                 />
-
                 <View className="flex-row justify-end space-x-3">
                   <TouchableOpacity onPress={() => setModalNuevoVisible(false)}>
                     <Text className="font-semibold text-gray-600">Cancelar</Text>

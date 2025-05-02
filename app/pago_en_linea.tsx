@@ -13,10 +13,24 @@ import {
 import RNHTMLtoPDF from "react-native-html-to-pdf"; // Importa la biblioteca para generar PDFs
 import * as FileSystem from "expo-file-system"; // Para manejar archivos en Expo
 import { Picker } from "@react-native-picker/picker"; // Importar Picker
+import { Feather } from "@expo/vector-icons"; // Asegúrate de importar Feather para el ícono de retroceder
+import { useRouter } from "expo-router"; // Importa useRouter
 
-const API_URL = "http://localhost:4000"; // Cambia esto por la URL de tu API
+const API_URL = "http://localhost:8081"; // Cambia esto por la URL de tu API
+
+const BackButton = ({ onPress }: { onPress: () => void }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={{ flexDirection: "row", alignItems: "center", marginTop: 16, marginBottom: 16 }}
+  >
+    <Feather name="arrow-left" size={24} color="#3b82f6" />
+    <Text style={{ marginLeft: 8, color: "#3b82f6", fontWeight: "600" }}>Volver</Text>
+  </TouchableOpacity>
+);
 
 export default function PagoEnLinea() {
+  const router = useRouter(); // Usa el router para navegar
+
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
   const [cedula, setCedula] = useState("");
@@ -29,13 +43,16 @@ export default function PagoEnLinea() {
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [cvc, setCvc] = useState("");
   const [carta, setCarta] = useState(""); // Estado para la carta
+  const [cartaAsunto, setCartaAsunto] = useState(""); // Estado para el asunto de la carta
+  const [cartaPlanNombre, setCartaPlanNombre] = useState(""); // Estado para el nombre del plan en la carta
   const [modalCartaVisible, setModalCartaVisible] = useState(false); // Modal para la carta
   const [currentStep, setCurrentStep] = useState(1); // Controla el paso actual (1: Carta, 2: Pago)
   const [comprobanteData, setComprobanteData] = useState<any>(null); // Datos del comprobante
   const [modalComprobanteVisible, setModalComprobanteVisible] = useState(false); // Modal para el comprobante
+  const [email, setEmail] = useState(""); // Nuevo estado para el correo electrónico
+  const [planPagado, setPlanPagado] = useState(false); // Estado para rastrear si el plan fue pagado
 
   useEffect(() => {
-    // Obtener los planes desde la API
     const fetchPlanes = async () => {
       try {
         const response = await fetch(`${API_URL}/planes`);
@@ -51,6 +68,20 @@ export default function PagoEnLinea() {
         }));
 
         setPlanes(planesConMonto);
+
+        // Verificar si el plan seleccionado ya fue pagado
+        if (selectedPlan) {
+          const verificarResponse = await fetch(`${API_URL}/Pagos/verificar`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cedula, planId: selectedPlan }),
+          });
+
+          if (verificarResponse.ok) {
+            const verificarData = await verificarResponse.json();
+            setPlanPagado(verificarData.pagado);
+          }
+        }
       } catch (error) {
         console.error("Error al obtener los planes:", error);
         Alert.alert("Error", "No se pudieron cargar los planes de estudio");
@@ -58,7 +89,7 @@ export default function PagoEnLinea() {
     };
 
     fetchPlanes();
-  }, []);
+  }, [selectedPlan]);
 
   const handleCargarComprobante = () => {
     if (!selectedPlan) {
@@ -73,7 +104,13 @@ export default function PagoEnLinea() {
       Alert.alert("Error", "Por favor, selecciona un plan de estudio.");
       return;
     }
-    setModalCartaVisible(true); // Mostrar el modal
+
+    if (planPagado) {
+      Alert.alert("Información", "Ya has pagado este plan. No es necesario generar otra carta.");
+      return;
+    }
+
+    setModalCartaVisible(true); // Mostrar el modal para la carta
     setCurrentStep(1); // Iniciar en el paso 1 (datos personales)
   };
 
@@ -86,129 +123,82 @@ export default function PagoEnLinea() {
   };
 
   const handleConfirmarCarta = () => {
-    if (!carta.trim()) {
-      Alert.alert("Error", "Por favor, escribe el contenido de la carta.");
+    if (!carta.trim() || !cartaAsunto.trim() || !cartaPlanNombre.trim()) {
+      Alert.alert("Error", "Por favor, completa todos los campos de la carta.");
       return;
     }
     setCurrentStep(3); // Avanzar al paso 3 (pago)
   };
 
   const handleConfirmarPago = async () => {
-    if (!tarjeta || !titular || !fechaVencimiento || !cvc) {
-        Alert.alert("Error", "Por favor, completa todos los campos de la tarjeta.");
-        return;
+    if (!tarjeta || !titular || !fechaVencimiento || !cvc || !email.trim()) {
+      Alert.alert("Error", "Por favor, completa todos los campos, incluido el correo electrónico.");
+      return;
     }
 
     try {
-        // Verificar si el plan ya fue pagado
-        const verificarResponse = await fetch(`${API_URL}/Pagos/verificar`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cedula, planId: selectedPlan }),
-        });
+      const pagoResponse = await fetch(`${API_URL}/Pagos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre,
+          apellido,
+          cedula,
+          planId: selectedPlan,
+          monto: planes.find((plan) => plan.id.toString() === selectedPlan)?.monto,
+          fecha: new Date().toISOString(),
+          email,
+        }),
+      });
 
-        if (!verificarResponse.ok) {
-            throw new Error("Error al verificar el estado del plan.");
-        }
+      if (!pagoResponse.ok) {
+        throw new Error("Error al registrar el pago.");
+      }
 
-        const verificarData = await verificarResponse.json();
-        if (verificarData.pagado) {
-            Alert.alert("Error", "Este plan ya ha sido pagado. No puedes realizar otro pago.");
-            setSelectedPlan(null); // Desmarcar el plan seleccionado
-            return; // Detener el flujo si el plan ya fue pagado
-        }
+      Alert.alert(
+        "Pago Confirmado",
+        `El comprobante ha sido enviado a tu correo. Has pagado los impuestos del plan: ${
+          planes.find((plan) => plan.id.toString() === selectedPlan)?.nombre
+        } por un monto de $${planes.find((plan) => plan.id.toString() === selectedPlan)?.monto}.`
+      );
 
-        // Continuar con el registro del pago
-        const pagoResponse = await fetch(`${API_URL}/Pagos`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                nombre,
-                apellido,
-                cedula,
-                planId: selectedPlan,
-                monto: planes.find((plan) => plan.id.toString() === selectedPlan)?.monto,
-                fecha: new Date().toISOString(),
-            }),
-        });
-
-        if (!pagoResponse.ok) {
-            throw new Error("Error al registrar el pago.");
-        }
-
-        const pagoData = await pagoResponse.json();
-
-        // Generar el comprobante en PDF
-        const htmlContent = `
-            <h1>Comprobante de Pago</h1>
-            <p><strong>Nombre:</strong> ${nombre} ${apellido}</p>
-            <p><strong>Cédula:</strong> ${cedula}</p>
-            <p><strong>Plan:</strong> ${planes.find((plan) => plan.id.toString() === selectedPlan)?.nombre || "N/A"}</p>
-            <p><strong>Monto:</strong> RD$${planes.find((plan) => plan.id.toString() === selectedPlan)?.monto || "0.00"}</p>
-            <p><strong>Fecha:</strong> ${new Date().toLocaleDateString()}</p>
-        `;
-
-        const options = {
-            html: htmlContent,
-            fileName: "comprobante_pago",
-            directory: "Documents",
-        };
-
-        const file = await RNHTMLtoPDF.convert(options);
-
-        setComprobante(file.filePath ?? null); // Guarda la ruta del archivo generado
-        Alert.alert(
-            "Pago Confirmado",
-            "El comprobante se ha generado correctamente. Puedes descargarlo o imprimirlo.",
-            [
-                {
-                    text: "Descargar",
-                    onPress: () => {
-                        if (Platform.OS === "web") {
-                            window.open(file.filePath, "_blank");
-                        } else {
-                            Alert.alert("Descarga", `Archivo guardado en: ${file.filePath}`);
-                        }
-                    },
-                },
-                {
-                    text: "Imprimir",
-                    onPress: () => {
-                        Alert.alert("Imprimir", "Función de impresión no implementada.");
-                    },
-                },
-            ]
-        );
+      setPlanPagado(true); // Marcar el plan como pagado
+      setModalCartaVisible(false); // Cerrar el modal
     } catch (error) {
-        console.error("Error al procesar el pago:", error);
-        Alert.alert("Error", "No se pudo procesar el pago.");
+      console.error("Error al procesar el pago:", error);
+      Alert.alert("Error", "No se pudo procesar el pago.");
     }
-};
+  };
 
   const handlePlanSeleccionado = async (planId: string | null) => {
     setSelectedPlan(planId);
 
-    if (!planId) return;
+    if (!planId) {
+      Alert.alert("Error", "Por favor, selecciona un plan.");
+      return;
+    }
 
     try {
-      // Verificar si el plan ya fue pagado
       const verificarResponse = await fetch(`${API_URL}/Pagos/verificar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cedula, planId }),
+        body: JSON.stringify({ planId }),
       });
 
       if (!verificarResponse.ok) {
+        const errorData = await verificarResponse.json();
+        console.error("Error al verificar el plan:", errorData.error || "Error desconocido");
         throw new Error("Error al verificar el estado del plan.");
       }
 
       const verificarData = await verificarResponse.json();
+      setPlanPagado(verificarData.pagado); // Actualiza el estado del plan pagado
+
       if (verificarData.pagado) {
         Alert.alert(
           "Plan ya pagado",
           "Ya has pagado los impuestos de este plan. No es necesario realizar otro pago."
         );
-        setSelectedPlan(null); // Desmarcar el plan seleccionado
       }
     } catch (error) {
       console.error("Error al verificar el plan:", error);
@@ -216,243 +206,260 @@ export default function PagoEnLinea() {
     }
   };
 
+  const handleVerComprobante = async () => {
+    if (!selectedPlan) {
+        Alert.alert("Error", "Por favor, selecciona un plan.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/Pagos/comprobante/${selectedPlan}`);
+        if (!response.ok) {
+            if (response.status === 404) {
+                Alert.alert("Error", "No se encontró un comprobante para este plan.");
+            } else {
+                throw new Error("Error al obtener el comprobante.");
+            }
+            return;
+        }
+
+        const data = await response.json();
+        setComprobanteData(data); // Guardar los datos del comprobante
+        setModalComprobanteVisible(true); // Mostrar el modal
+    } catch (error) {
+        console.error("Error al obtener el comprobante:", error);
+        Alert.alert("Error", "No se pudo obtener el comprobante. Por favor, intenta nuevamente.");
+    }
+};
+
+  const handleBack = () => {
+    router.push("/home"); // Navega de regreso a la pantalla principal
+  };
+
   return (
     <View style={styles.container}>
+      {/* Título */}
+      
+      {/* Botón de retroceder */}
+      <BackButton onPress={handleBack} />
       <Text style={styles.title}>Pago en Línea</Text>
 
+      {/* Subtítulo */}
       <Text style={styles.subtitle}>Selecciona un plan de estudio:</Text>
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={selectedPlan}
-          onValueChange={(itemValue) => handlePlanSeleccionado(itemValue)}
-          style={styles.picker}
-        >
-          <Picker.Item label="Seleccionar..." value={null} />
-          {planes.map((plan) => (
-            <Picker.Item
-              key={plan.id}
-              label={plan.nombre}
-              value={plan.id.toString()}
-            />
-          ))}
-        </Picker>
+
+      {/* Picker con contenedor estilizado */}
+      <View
+     
+      >
+       
+                 <Picker
+                   selectedValue={selectedPlan}
+                   onValueChange={(itemValue) => setSelectedPlan(itemValue)}
+                   className="mb-4 border border-gray-300 rounded-md"
+                 >
+                   <Picker.Item label="Seleccionar..." value="" />
+                   {planes.map((plan: any) => (
+                     <Picker.Item key={plan.id} label={plan.nombre} value={plan.id} />
+                   ))}
+                 </Picker>
       </View>
 
+      {/* Botones */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 150 }}>
+        <TouchableOpacity
+          onPress={handleGenerarCarta}
+          style={[
+            styles.generateButton,
+            { flex: 1, marginRight: 8, backgroundColor: planPagado ? "#d1d5db" : "#6366f1" },
+          ]}
+          disabled={!selectedPlan || planPagado} // Desactiva si no hay plan seleccionado o si ya fue pagado
+        >
+          <Text style={styles.buttonText}>
+            {planPagado ? "Plan Pagado" : "Generar Carta de Solicitud y Pago"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleVerComprobante}
+          style={[
+            styles.generateButton,
+            { flex: 1, marginLeft: 8, backgroundColor: planPagado ? "#4caf50" : "#d1d5db" },
+          ]}
+          disabled={!planPagado} // Desactiva si el plan no ha sido pagado
+        >
+          <Text style={styles.buttonText}>Ver Comprobante</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Texto "Plan seleccionado" */}
       {selectedPlan && (
         <Text style={styles.selectedPlanText}>
           Plan seleccionado: {planes.find((plan) => plan.id.toString() === selectedPlan)?.nombre}
         </Text>
       )}
 
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
-        <TouchableOpacity
-          onPress={handleGenerarCarta}
-          style={[styles.generateButton, { flex: 1, marginRight: 8 }]}
-          disabled={!selectedPlan} // Deshabilitar si no hay plan seleccionado
-        >
-          <Text style={styles.buttonText}>Generar Carta de Solicitud y Pago</Text>
-        </TouchableOpacity>
+      {/* Modal para la carta */}
+      <Modal visible={modalCartaVisible} animationType="slide">
+        <View style={styles.container}>
+          {currentStep === 1 && (
+            <>
+              <Text style={styles.subtitle}>Datos Personales</Text>
+              <TextInput
+                placeholder="Nombre"
+                value={nombre}
+                onChangeText={setNombre}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="Apellido"
+                value={apellido}
+                onChangeText={setApellido}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="Cédula"
+                value={cedula}
+                onChangeText={setCedula}
+                style={styles.input}
+              />
+              <TouchableOpacity
+                onPress={handleConfirmarDatos}
+                style={styles.generateButton}
+              >
+                <Text style={styles.buttonText}>Confirmar Datos</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-        <TouchableOpacity
-          onPress={async () => {
-            if (!selectedPlan) {
-              Alert.alert("Error", "Por favor, selecciona un plan.");
-              return;
-            }
+          {currentStep === 2 && (
+            <>
+              <Text style={styles.subtitle}>Escribe tu Carta</Text>
+              <TextInput
+                placeholder="Asunto"
+                value={cartaAsunto}
+                onChangeText={setCartaAsunto}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="Nombre del Plan"
+                value={cartaPlanNombre}
+                onChangeText={setCartaPlanNombre}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="Escribe aquí tu carta..."
+                value={carta}
+                onChangeText={setCarta}
+                style={[styles.input, { height: 100, textAlignVertical: "top" }]}
+                multiline
+              />
+              <TouchableOpacity
+                onPress={handleConfirmarCarta}
+                style={styles.generateButton}
+              >
+                <Text style={styles.buttonText}>Confirmar Carta</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-            try {
-              const response = await fetch(`${API_URL}/Pagos/comprobante/${cedula}/${selectedPlan}`);
-              if (!response.ok) {
-                if (response.status === 404) {
-                  Alert.alert("Error", "No se encontró un comprobante para este plan.");
-                } else {
-                  throw new Error("Error al obtener el comprobante.");
-                }
-                return;
-              }
-
-              const data = await response.json();
-              setComprobanteData(data); // Guardar los datos del comprobante
-              setModalComprobanteVisible(true); // Mostrar el modal
-            } catch (error) {
-              console.error("Error al obtener el comprobante:", error);
-              Alert.alert("Error", "No se pudo obtener el comprobante.");
-            }
-          }}
-          style={[
-            styles.generateButton,
-            { flex: 1, marginLeft: 8, backgroundColor: selectedPlan ? "#4caf50" : "#d1d5db" },
-          ]}
-          disabled={!selectedPlan} // Deshabilitar si no hay plan seleccionado
-        >
-          <Text style={styles.buttonText}>Ver Comprobante</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Modal
-        visible={modalCartaVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalCartaVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            {currentStep === 1 && (
-              <>
-                <Text style={styles.modalTitle}>Datos Personales</Text>
-                <TextInput
-                  placeholder="Nombre"
-                  value={nombre}
-                  onChangeText={setNombre}
-                  style={styles.input}
-                />
-                <TextInput
-                  placeholder="Apellido"
-                  value={apellido}
-                  onChangeText={setApellido}
-                  style={styles.input}
-                />
-                <TextInput
-                  placeholder="Cédula"
-                  value={cedula}
-                  onChangeText={setCedula}
-                  style={styles.input}
-                  keyboardType="numeric"
-                />
-                <TouchableOpacity
-                  onPress={handleConfirmarDatos}
-                  style={styles.confirmButton}
-                >
-                  <Text style={styles.buttonText}>Siguiente</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setModalCartaVisible(false)}
-                  style={styles.cancelButton}
-                >
-                  <Text style={styles.buttonText}>Cancelar</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            {currentStep === 2 && (
-              <>
-                <Text style={styles.modalTitle}>Escribir Carta de Solicitud</Text>
-                <TextInput
-                  placeholder="Escribe aquí el contenido de la carta..."
-                  value={carta}
-                  onChangeText={setCarta}
-                  style={[styles.input, { height: 200, textAlignVertical: "top" }]}
-                  multiline={true}
-                />
-                <TouchableOpacity
-                  onPress={handleConfirmarCarta}
-                  style={styles.confirmButton}
-                >
-                  <Text style={styles.buttonText}>Siguiente</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setModalCartaVisible(false)}
-                  style={styles.cancelButton}
-                >
-                  <Text style={styles.buttonText}>Cancelar</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            {currentStep === 3 && (
-              <>
-                <Text style={styles.modalTitle}>Información del Pago</Text>
-                <Text style={styles.modalText}>
-                  Este monto corresponde al impuesto necesario para la creación del plan.
+          {currentStep === 3 && (
+            <>
+              <Text style={styles.subtitle}>Información de Pago</Text>
+              <Text style={styles.infoText}>
+                Estás pagando los impuestos del plan:{" "}
+                <Text style={{ fontWeight: "bold" }}>
+                  {planes.find((plan) => plan.id.toString() === selectedPlan)?.nombre}
                 </Text>
-                <Text style={styles.modalText}>
-                  Monto: RD${planes.find((plan) => plan.id.toString() === selectedPlan)?.monto || "0.00"}
+              </Text>
+              <Text style={styles.infoText}>
+                Monto a pagar:{" "}
+                <Text style={{ fontWeight: "bold", color: "#16a34a" }}>
+                  ${planes.find((plan) => plan.id.toString() === selectedPlan)?.monto}
                 </Text>
-                <Text style={styles.modalText}>
-                  Plan: {planes.find((plan) => plan.id.toString() === selectedPlan)?.nombre || "No seleccionado"}
-                </Text>
+              </Text>
+              <TextInput
+                placeholder="Número de Tarjeta"
+                value={tarjeta}
+                onChangeText={setTarjeta}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="Titular de la Tarjeta"
+                value={titular}
+                onChangeText={setTitular}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="Fecha de Vencimiento (MM/AA)"
+                value={fechaVencimiento}
+                onChangeText={setFechaVencimiento}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="CVC"
+                value={cvc}
+                onChangeText={setCvc}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="Correo Electrónico"
+                value={email}
+                onChangeText={setEmail}
+                style={styles.input}
+              />
+              <TouchableOpacity
+                onPress={handleConfirmarPago}
+                style={styles.generateButton}
+              >
+                <Text style={styles.buttonText}>Confirmar Pago</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-                <TextInput
-                  placeholder="Número de Tarjeta"
-                  value={tarjeta}
-                  onChangeText={setTarjeta}
-                  style={styles.input}
-                  keyboardType="numeric"
-                />
-                <TextInput
-                  placeholder="Titular"
-                  value={titular}
-                  onChangeText={setTitular}
-                  style={styles.input}
-                />
-                <TextInput
-                  placeholder="MM/YY"
-                  value={fechaVencimiento}
-                  onChangeText={setFechaVencimiento}
-                  style={styles.input}
-                />
-                <TextInput
-                  placeholder="CVC"
-                  value={cvc}
-                  onChangeText={setCvc}
-                  style={styles.input}
-                  keyboardType="numeric"
-                />
-
-                <TouchableOpacity
-                  onPress={handleConfirmarPago}
-                  style={styles.confirmButton}
-                >
-                  <Text style={styles.buttonText}>Confirmar Pago</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setModalCartaVisible(false)}
-                  style={styles.cancelButton}
-                >
-                  <Text style={styles.buttonText}>Cancelar</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
+          <TouchableOpacity
+            onPress={() => setModalCartaVisible(false)}
+            style={[styles.generateButton, { backgroundColor: "#ef4444" }]}
+          >
+            <Text style={styles.buttonText}>Cancelar</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
 
-      <Modal
-        visible={modalComprobanteVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalComprobanteVisible(false)}
-      >
-        <View style={styles.modalContainer}>
+      {/* Modal para el comprobante */}
+      <Modal visible={modalComprobanteVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Comprobante de Pago</Text>
             {comprobanteData ? (
               <>
-                <Text style={styles.modalTitle}>Comprobante de Pago</Text>
                 <Text style={styles.modalText}>
-                  <Text style={{ fontWeight: "bold" }}>Nombre:</Text> {comprobanteData.nombre} {comprobanteData.apellido}
+                  <Text style={{ fontWeight: "bold" }}>Nombre:</Text> {comprobanteData.nombre}
+                </Text>
+                <Text style={styles.modalText}>
+                  <Text style={{ fontWeight: "bold" }}>Apellido:</Text> {comprobanteData.apellido}
                 </Text>
                 <Text style={styles.modalText}>
                   <Text style={{ fontWeight: "bold" }}>Cédula:</Text> {comprobanteData.cedula}
                 </Text>
                 <Text style={styles.modalText}>
-                  <Text style={{ fontWeight: "bold" }}>Plan:</Text> {planes.find((plan) => plan.id.toString() === selectedPlan)?.nombre || "N/A"}
+                  <Text style={{ fontWeight: "bold" }}>Plan:</Text> {comprobanteData.planNombre}
                 </Text>
                 <Text style={styles.modalText}>
-                  <Text style={{ fontWeight: "bold" }}>Monto:</Text> RD${comprobanteData.monto}
+                  <Text style={{ fontWeight: "bold" }}>Monto:</Text> ${comprobanteData.monto}
                 </Text>
                 <Text style={styles.modalText}>
                   <Text style={{ fontWeight: "bold" }}>Fecha:</Text> {new Date(comprobanteData.fecha).toLocaleDateString()}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setModalComprobanteVisible(false)}
-                  style={styles.confirmButton}
-                >
-                  <Text style={styles.buttonText}>Cerrar</Text>
-                </TouchableOpacity>
               </>
             ) : (
               <Text style={styles.modalText}>Cargando comprobante...</Text>
             )}
+            <TouchableOpacity
+              onPress={() => setModalComprobanteVisible(false)}
+              style={[styles.generateButton, { backgroundColor: "#ef4444", marginTop: 16 }]}
+            >
+              <Text style={styles.buttonText}>Cerrar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -463,7 +470,7 @@ export default function PagoEnLinea() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 20,
     backgroundColor: "#ffffff",
   },
   title: {
@@ -479,21 +486,16 @@ const styles = StyleSheet.create({
     color: "#1e293b",
     marginBottom: 12,
   },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
-    marginBottom: 16,
-  },
   picker: {
     height: 50,
     color: "#1e293b",
+    marginBottom: 16, // Espaciado entre el picker y el texto seleccionado
   },
   selectedPlanText: {
     fontSize: 16,
     color: "#1e293b",
-    marginBottom: 16,
+    marginTop: 32, // Espaciado adicional para colocarlo al final
+    textAlign: "center",
   },
   generateButton: {
     backgroundColor: "#6366f1",
@@ -506,47 +508,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  modalContainer: {
+  input: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    fontSize: 16,
+  },
+  infoText: {
+    fontSize: 16,
+    color: "#1e293b",
+    marginBottom: 8,
+  },
+  modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Fondo semi-transparente
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContent: {
     width: "80%",
     backgroundColor: "#ffffff",
     borderRadius: 8,
-    padding: 16,
-    elevation: 5,
+    padding: 20,
+    alignItems: "center",
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 12,
+    color: "#1e293b",
+    marginBottom: 16,
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 12,
-  },
-  input: {
-    height: 40,
-    borderColor: "#d1d5db",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 12,
-  },
-  confirmButton: {
-    backgroundColor: "#4caf50",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  cancelButton: {
-    backgroundColor: "#f44336",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
+    color: "#1e293b",
+    marginBottom: 8,
+    textAlign: "center",
   },
 });

@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { ProtectedRoute } from "./protectedRoute"; // Importa el componente ProtectedRoute
 
-const API_URL = "http://localhost:4000";
+const API_URL = "http://localhost:8081"; // Cambia esto si tu backend está en otro lugar
 
 const BackButton = () => {
   const router = useRouter();
@@ -88,22 +88,37 @@ export default function MisPlanesScreen() {
     setPensum([]);
   };
 
-  const eliminarPlan = async (planId: number) => {
-    try {
-      const response = await fetch(`${API_URL}/planes/${planId}`, {
-        method: "DELETE",
-      });
+  const handleEliminarPlan = async (planId: number) => {
+    Alert.alert(
+      "Confirmar eliminación",
+      "¿Estás seguro de que deseas eliminar este plan?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_URL}/planes/${planId}`, {
+                method: "DELETE",
+              });
 
-      if (response.ok) {
-        setPlanes(planes.filter((plan) => plan.id !== planId)); // Actualiza la lista de planes
-        Alert.alert("Éxito", "Plan eliminado correctamente");
-      } else {
-        Alert.alert("Error", "No se pudo eliminar el plan");
-      }
-    } catch (error) {
-      console.error("Error al eliminar plan:", error);
-      Alert.alert("Error", "No se pudo conectar con el servidor");
-    }
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "No se pudo eliminar el plan");
+              }
+
+              Alert.alert("Éxito", "Plan eliminado exitosamente");
+              // Actualiza la lista de planes después de eliminar
+              setPlanes((prevPlanes) => prevPlanes.filter((plan) => plan.id !== planId));
+            } catch (error) {
+              console.error("Error al eliminar el plan:", error);
+              Alert.alert("Error", error instanceof Error ? error.message : "No se pudo eliminar el plan");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const groupBySemester = (asignaturas: Asignatura[]) => {
@@ -129,7 +144,7 @@ export default function MisPlanesScreen() {
   };
 
   return (
-    <ProtectedRoute> {/* Envuelve el contenido con ProtectedRoute */}
+    <ProtectedRoute>
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 px-4 pt-6 bg-white">
           <BackButton />
@@ -153,25 +168,14 @@ export default function MisPlanesScreen() {
                   renderItem={({ item }) => (
                     <View className="relative p-4 mb-3 bg-white border border-gray-200 rounded-lg shadow-sm">
                       <TouchableOpacity onPress={() => handlePlanSelect(item)}>
-                        <Text className="text-base font-semibold text-gray-800">
-                          {item.nombre}
-                        </Text>
+                        <Text className="text-base font-semibold text-gray-800">{item.nombre}</Text>
                         <Text className="text-sm text-gray-500">
                           Creado el {new Date(item.fechaCreacion).toLocaleDateString()}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
+                        onPress={() => handleEliminarPlan(item.id)} // Cambia onClick por onPress
                         className="absolute bottom-2 right-2 p-2"
-                        onPress={() =>
-                          Alert.alert(
-                            "Eliminar Plan",
-                            "¿Estás seguro de que deseas eliminar este plan?",
-                            [
-                              { text: "Cancelar", style: "cancel" },
-                              { text: "Eliminar", style: "destructive", onPress: () => eliminarPlan(item.id) },
-                            ]
-                          )
-                        }
                       >
                         <Feather name="trash-2" size={20} color="#ef4444" />
                       </TouchableOpacity>

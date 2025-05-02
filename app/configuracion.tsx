@@ -1,5 +1,5 @@
 // app/configuracion.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,16 +10,64 @@ import {
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import { AntDesign } from "@expo/vector-icons";
+import { useAuth } from "./authContext"; // Importa el contexto
 
 export default function ConfiguracionScreen() {
-  const [name, setName] = useState("Miguel");
-  const [lastName, setLastName] = useState("Evangelista");
-  const [email, setEmail] = useState("miguel@example.com");
+  const { updateUser } = useAuth(); // Obtén la función para actualizar el usuario
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
 
-  const handleSave = () => {
-    Alert.alert("Datos guardados", "Tu información ha sido actualizada.");
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const userData = await AsyncStorage.getItem("userData");
+      if (userData) {
+        const user = JSON.parse(userData);
+        setName(user.name);
+        setLastName(user.lastName);
+        setEmail(user.email);
+        setPhoto(user.photo || null);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      const userData = { name, lastName, email, photo }; // Incluye la foto
+      console.log("Datos enviados al backend:", userData); // Verifica los datos enviados
+      const token = await AsyncStorage.getItem("authToken");
+
+      const response = await fetch("http://localhost:8081/updateUser", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
+        updateUser(updatedUser); // Actualiza los datos en el contexto
+        Alert.alert("Éxito", "Tus datos han sido actualizados.");
+        router.back(); // Regresa al Home
+      } else {
+        const errorData = await response.json();
+        Alert.alert("Error", errorData.error || "No se pudieron actualizar los datos.");
+      }
+    } catch (error) {
+      console.error("Error en handleSave:", error);
+      Alert.alert("Error", "Hubo un problema al actualizar los datos.");
+    }
   };
 
   const pickImage = async () => {
@@ -31,16 +79,24 @@ export default function ConfiguracionScreen() {
     });
 
     if (!result.canceled) {
-      setPhoto(result.assets[0].uri);
+      console.log("Imagen seleccionada:", result.assets[0].uri); // Verifica la URI de la imagen
+      setPhoto(result.assets[0].uri); // Guarda la URI de la imagen seleccionada
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView className="flex-1 px-4 pt-6 bg-white">
-        <Text className="mb-4 text-xl font-bold text-blue-900">
-          Configuración
-        </Text>
+        {/* Botón de retroceder */}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="flex-row items-center mb-4"
+        >
+          <AntDesign name="arrowleft" size={24} color="#1d4ed8" />
+          <Text className="ml-2 text-lg font-semibold text-blue-900">
+            Configuración
+          </Text>
+        </TouchableOpacity>
 
         {/* Foto de perfil */}
         <TouchableOpacity onPress={pickImage} className="items-center mb-6">
